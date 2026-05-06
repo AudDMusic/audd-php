@@ -1,0 +1,12 @@
+/vendor/
+/composer.lock
+.phpunit.result.cache
+.phpunit.cache/
+.php-cs-fixer.cache
+.phpstan.cache/
+/build/
+/.idea/
+/.vscode/
+*.swp
+*.swo
+.DS_Store
