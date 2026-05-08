@@ -1,0 +1,38 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'audd-php/v*'
+      - 'v*'
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify tagged release passes tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+          tools: composer:v2
+      - name: Composer install
+        run: composer install --prefer-dist --no-progress
+      - name: PHPUnit
+        run: composer test
+      - name: Notify Packagist
+        env:
+          PACKAGIST_USERNAME: ${{ secrets.PACKAGIST_USERNAME }}
+          PACKAGIST_API_TOKEN: ${{ secrets.PACKAGIST_API_TOKEN }}
+        run: |
+          if [ -n "$PACKAGIST_USERNAME" ] && [ -n "$PACKAGIST_API_TOKEN" ]; then
+            curl -X POST \
+              -H 'content-type:application/json' \
+              "https://packagist.org/api/update-package?username=$PACKAGIST_USERNAME&apiToken=$PACKAGIST_API_TOKEN" \
+              -d '{"repository":{"url":"https://packagist.org/packages/audd/audd"}}'
+          else
+            echo "PACKAGIST_USERNAME / PACKAGIST_API_TOKEN not configured — skipping. Configure repository webhook for auto-sync."
+          fi
