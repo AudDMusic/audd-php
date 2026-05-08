@@ -1,0 +1,27 @@
+{
+    "name": "audd/example-stream-to-csv",
+    "description": "Subscribe to (or attach to) an AudD stream slot, longpoll its recognitions, and append matches to a CSV.",
+    "type": "project",
+    "license": "MIT",
+    "require": {
+        "php": ">=8.1",
+        "ext-json": "*",
+        "ext-pcntl": "*",
+        "audd/audd": "^1.4.5"
+    },
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../..",
+            "options": {
+                "symlink": false,
+                "versions": {
+                    "audd/audd": "1.4.5"
+                }
+            }
+        }
+    ],
+    "config": {
+        "sort-packages": true
+    }
+}
