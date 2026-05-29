@@ -19,11 +19,11 @@ final class NapsterMetadata extends ForwardCompatModel
      */
     public function __construct(array $payload)
     {
-        $this->id = isset($payload['id']) ? (string) $payload['id'] : null;
-        $this->name = isset($payload['name']) ? (string) $payload['name'] : null;
-        $this->isrc = isset($payload['isrc']) ? (string) $payload['isrc'] : null;
-        $this->artistName = isset($payload['artistName']) ? (string) $payload['artistName'] : null;
-        $this->albumName = isset($payload['albumName']) ? (string) $payload['albumName'] : null;
+        $this->id = self::asString($payload['id'] ?? null);
+        $this->name = self::asString($payload['name'] ?? null);
+        $this->isrc = self::asString($payload['isrc'] ?? null);
+        $this->artistName = self::asString($payload['artistName'] ?? null);
+        $this->albumName = self::asString($payload['albumName'] ?? null);
         parent::__construct(self::extractExtras($payload, self::KNOWN), $payload);
     }
 }

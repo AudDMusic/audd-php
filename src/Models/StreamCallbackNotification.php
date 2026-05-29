@@ -28,10 +28,10 @@ final class StreamCallbackNotification extends ForwardCompatModel
      */
     public function __construct(array $payload, ?int $outerTime = null)
     {
-        $this->radio_id = (int) ($payload['radio_id'] ?? 0);
-        $this->stream_running = isset($payload['stream_running']) ? (bool) $payload['stream_running'] : null;
-        $this->notification_code = (int) ($payload['notification_code'] ?? 0);
-        $this->notification_message = (string) ($payload['notification_message'] ?? '');
+        $this->radio_id = self::asInt($payload['radio_id'] ?? null) ?? 0;
+        $this->stream_running = self::asBool($payload['stream_running'] ?? null);
+        $this->notification_code = self::asInt($payload['notification_code'] ?? null) ?? 0;
+        $this->notification_message = self::asString($payload['notification_message'] ?? null) ?? '';
         $this->time = $outerTime;
         parent::__construct(self::extractExtras($payload, self::KNOWN), $payload);
     }

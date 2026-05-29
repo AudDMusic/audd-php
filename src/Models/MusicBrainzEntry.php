@@ -18,12 +18,13 @@ final class MusicBrainzEntry extends ForwardCompatModel
      */
     public function __construct(array $payload)
     {
-        $this->id = (string) ($payload['id'] ?? '');
-        /** @var int|string|null $score */
+        $this->id = self::asString($payload['id'] ?? null) ?? '';
         $score = $payload['score'] ?? null;
-        $this->score = $score;
-        $this->title = isset($payload['title']) ? (string) $payload['title'] : null;
-        $this->length = isset($payload['length']) ? (int) $payload['length'] : null;
+        // MusicBrainz scores arrive as int or numeric string; preserve both,
+        // drop anything else (array/object) to null.
+        $this->score = (is_int($score) || is_string($score)) ? $score : null;
+        $this->title = self::asString($payload['title'] ?? null);
+        $this->length = self::asInt($payload['length'] ?? null);
         parent::__construct(self::extractExtras($payload, self::KNOWN), $payload);
     }
 }

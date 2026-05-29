@@ -25,14 +25,14 @@ final class SpotifyMetadata extends ForwardCompatModel
      */
     public function __construct(array $payload)
     {
-        $this->id = isset($payload['id']) ? (string) $payload['id'] : null;
-        $this->name = isset($payload['name']) ? (string) $payload['name'] : null;
-        $this->duration_ms = isset($payload['duration_ms']) ? (int) $payload['duration_ms'] : null;
-        $this->explicit = isset($payload['explicit']) ? (bool) $payload['explicit'] : null;
-        $this->popularity = isset($payload['popularity']) ? (int) $payload['popularity'] : null;
-        $this->track_number = isset($payload['track_number']) ? (int) $payload['track_number'] : null;
-        $this->type = isset($payload['type']) ? (string) $payload['type'] : null;
-        $this->uri = isset($payload['uri']) ? (string) $payload['uri'] : null;
+        $this->id = self::asString($payload['id'] ?? null);
+        $this->name = self::asString($payload['name'] ?? null);
+        $this->duration_ms = self::asInt($payload['duration_ms'] ?? null);
+        $this->explicit = self::asBool($payload['explicit'] ?? null);
+        $this->popularity = self::asInt($payload['popularity'] ?? null);
+        $this->track_number = self::asInt($payload['track_number'] ?? null);
+        $this->type = self::asString($payload['type'] ?? null);
+        $this->uri = self::asString($payload['uri'] ?? null);
         parent::__construct(self::extractExtras($payload, self::KNOWN), $payload);
     }
 }

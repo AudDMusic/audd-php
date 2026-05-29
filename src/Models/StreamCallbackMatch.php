@@ -36,9 +36,9 @@ final class StreamCallbackMatch extends ForwardCompatModel
      */
     public function __construct(array $payload)
     {
-        $this->radio_id = (int) ($payload['radio_id'] ?? 0);
-        $this->timestamp = isset($payload['timestamp']) ? (string) $payload['timestamp'] : null;
-        $this->play_length = isset($payload['play_length']) ? (int) $payload['play_length'] : null;
+        $this->radio_id = self::asInt($payload['radio_id'] ?? null) ?? 0;
+        $this->timestamp = self::asString($payload['timestamp'] ?? null);
+        $this->play_length = self::asInt($payload['play_length'] ?? null);
         $songs = [];
         if (isset($payload['results']) && is_array($payload['results'])) {
             foreach ($payload['results'] as $entry) {

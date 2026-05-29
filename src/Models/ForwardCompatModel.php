@@ -80,4 +80,77 @@ abstract class ForwardCompatModel
         }
         return $extras;
     }
+
+    /**
+     * Coerce an arbitrary payload value to a string, or null.
+     *
+     * A successful response must never throw or warn on a wrong-typed field:
+     * arrays/objects and null degrade to null instead of triggering an
+     * "Array to string conversion" warning (which `failOnWarning` test
+     * configs and warning-to-exception handlers turn into a throw).
+     */
+    protected static function asString(mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+        if (is_string($value)) {
+            return $value;
+        }
+        if (is_int($value) || is_float($value) || is_bool($value)) {
+            return (string) $value;
+        }
+        // Arrays, objects, resources: not representable as a scalar string.
+        return null;
+    }
+
+    /**
+     * Coerce an arbitrary payload value to an int, or null.
+     *
+     * Non-numeric strings, arrays, objects and null degrade to null rather
+     * than coercing to a misleading 0.
+     */
+    protected static function asInt(mixed $value): ?int
+    {
+        if ($value === null) {
+            return null;
+        }
+        if (is_int($value)) {
+            return $value;
+        }
+        if (is_bool($value)) {
+            return (int) $value;
+        }
+        if (is_float($value)) {
+            return (int) $value;
+        }
+        if (is_string($value) && is_numeric($value)) {
+            return (int) $value;
+        }
+        return null;
+    }
+
+    /**
+     * Coerce an arbitrary payload value to a bool, or null.
+     */
+    protected static function asBool(mixed $value): ?bool
+    {
+        if ($value === null) {
+            return null;
+        }
+        if (is_bool($value)) {
+            return $value;
+        }
+        if (is_int($value) || is_float($value)) {
+            return (bool) $value;
+        }
+        if (is_string($value)) {
+            $v = strtolower(trim($value));
+            if ($v === '' || $v === 'false' || $v === '0' || $v === 'no') {
+                return false;
+            }
+            return true;
+        }
+        return null;
+    }
 }

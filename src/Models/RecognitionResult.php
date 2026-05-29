@@ -42,16 +42,16 @@ final class RecognitionResult extends ForwardCompatModel
      */
     public function __construct(array $payload)
     {
-        $this->timecode = (string) ($payload['timecode'] ?? '');
-        $this->audio_id = isset($payload['audio_id']) ? (int) $payload['audio_id'] : null;
-        $this->artist = isset($payload['artist']) ? (string) $payload['artist'] : null;
-        $this->title = isset($payload['title']) ? (string) $payload['title'] : null;
-        $this->album = isset($payload['album']) ? (string) $payload['album'] : null;
-        $this->release_date = isset($payload['release_date']) ? (string) $payload['release_date'] : null;
-        $this->label = isset($payload['label']) ? (string) $payload['label'] : null;
-        $this->song_link = isset($payload['song_link']) ? (string) $payload['song_link'] : null;
-        $this->isrc = isset($payload['isrc']) ? (string) $payload['isrc'] : null;
-        $this->upc = isset($payload['upc']) ? (string) $payload['upc'] : null;
+        $this->timecode = self::asString($payload['timecode'] ?? null) ?? '';
+        $this->audio_id = self::asInt($payload['audio_id'] ?? null);
+        $this->artist = self::asString($payload['artist'] ?? null);
+        $this->title = self::asString($payload['title'] ?? null);
+        $this->album = self::asString($payload['album'] ?? null);
+        $this->release_date = self::asString($payload['release_date'] ?? null);
+        $this->label = self::asString($payload['label'] ?? null);
+        $this->song_link = self::asString($payload['song_link'] ?? null);
+        $this->isrc = self::asString($payload['isrc'] ?? null);
+        $this->upc = self::asString($payload['upc'] ?? null);
         $this->apple_music = isset($payload['apple_music']) && is_array($payload['apple_music'])
             ? new AppleMusicMetadata($payload['apple_music']) : null;
         $this->spotify = isset($payload['spotify']) && is_array($payload['spotify'])

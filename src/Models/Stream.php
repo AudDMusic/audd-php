@@ -21,11 +21,10 @@ final class Stream extends ForwardCompatModel
      */
     public function __construct(array $payload)
     {
-        $this->radio_id = (int) ($payload['radio_id'] ?? 0);
-        $this->url = (string) ($payload['url'] ?? '');
-        $this->stream_running = (bool) ($payload['stream_running'] ?? false);
-        $this->longpoll_category = isset($payload['longpoll_category'])
-            ? (string) $payload['longpoll_category'] : null;
+        $this->radio_id = self::asInt($payload['radio_id'] ?? null) ?? 0;
+        $this->url = self::asString($payload['url'] ?? null) ?? '';
+        $this->stream_running = self::asBool($payload['stream_running'] ?? null) ?? false;
+        $this->longpoll_category = self::asString($payload['longpoll_category'] ?? null);
         parent::__construct(self::extractExtras($payload, self::KNOWN), $payload);
     }
 }

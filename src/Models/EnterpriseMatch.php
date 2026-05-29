@@ -19,7 +19,12 @@ final class EnterpriseMatch extends ForwardCompatModel
         'label', 'isrc', 'upc', 'song_link', 'start_offset', 'end_offset',
     ];
 
-    public readonly int $score;
+    /**
+     * Match confidence, 0–100. Absent on enterprise responses that don't
+     * compute a score (e.g. the metadata-only path) — null in that case,
+     * never silently 0.
+     */
+    public readonly ?int $score;
     public readonly string $timecode;
     public readonly ?string $artist;
     public readonly ?string $title;
@@ -37,18 +42,18 @@ final class EnterpriseMatch extends ForwardCompatModel
      */
     public function __construct(array $payload)
     {
-        $this->score = (int) ($payload['score'] ?? 0);
-        $this->timecode = (string) ($payload['timecode'] ?? '');
-        $this->artist = isset($payload['artist']) ? (string) $payload['artist'] : null;
-        $this->title = isset($payload['title']) ? (string) $payload['title'] : null;
-        $this->album = isset($payload['album']) ? (string) $payload['album'] : null;
-        $this->release_date = isset($payload['release_date']) ? (string) $payload['release_date'] : null;
-        $this->label = isset($payload['label']) ? (string) $payload['label'] : null;
-        $this->isrc = isset($payload['isrc']) ? (string) $payload['isrc'] : null;
-        $this->upc = isset($payload['upc']) ? (string) $payload['upc'] : null;
-        $this->song_link = isset($payload['song_link']) ? (string) $payload['song_link'] : null;
-        $this->start_offset = isset($payload['start_offset']) ? (int) $payload['start_offset'] : null;
-        $this->end_offset = isset($payload['end_offset']) ? (int) $payload['end_offset'] : null;
+        $this->score = self::asInt($payload['score'] ?? null);
+        $this->timecode = self::asString($payload['timecode'] ?? null) ?? '';
+        $this->artist = self::asString($payload['artist'] ?? null);
+        $this->title = self::asString($payload['title'] ?? null);
+        $this->album = self::asString($payload['album'] ?? null);
+        $this->release_date = self::asString($payload['release_date'] ?? null);
+        $this->label = self::asString($payload['label'] ?? null);
+        $this->isrc = self::asString($payload['isrc'] ?? null);
+        $this->upc = self::asString($payload['upc'] ?? null);
+        $this->song_link = self::asString($payload['song_link'] ?? null);
+        $this->start_offset = self::asInt($payload['start_offset'] ?? null);
+        $this->end_offset = self::asInt($payload['end_offset'] ?? null);
         parent::__construct(self::extractExtras($payload, self::KNOWN), $payload);
     }
 

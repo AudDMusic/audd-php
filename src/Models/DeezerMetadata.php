@@ -18,10 +18,10 @@ final class DeezerMetadata extends ForwardCompatModel
      */
     public function __construct(array $payload)
     {
-        $this->id = isset($payload['id']) ? (int) $payload['id'] : null;
-        $this->title = isset($payload['title']) ? (string) $payload['title'] : null;
-        $this->duration = isset($payload['duration']) ? (int) $payload['duration'] : null;
-        $this->link = isset($payload['link']) ? (string) $payload['link'] : null;
+        $this->id = self::asInt($payload['id'] ?? null);
+        $this->title = self::asString($payload['title'] ?? null);
+        $this->duration = self::asInt($payload['duration'] ?? null);
+        $this->link = self::asString($payload['link'] ?? null);
         parent::__construct(self::extractExtras($payload, self::KNOWN), $payload);
     }
 }

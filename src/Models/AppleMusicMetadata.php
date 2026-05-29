@@ -27,16 +27,16 @@ final class AppleMusicMetadata extends ForwardCompatModel
      */
     public function __construct(array $payload)
     {
-        $this->artistName = isset($payload['artistName']) ? (string) $payload['artistName'] : null;
-        $this->url = isset($payload['url']) ? (string) $payload['url'] : null;
-        $this->durationInMillis = isset($payload['durationInMillis']) ? (int) $payload['durationInMillis'] : null;
-        $this->name = isset($payload['name']) ? (string) $payload['name'] : null;
-        $this->isrc = isset($payload['isrc']) ? (string) $payload['isrc'] : null;
-        $this->albumName = isset($payload['albumName']) ? (string) $payload['albumName'] : null;
-        $this->trackNumber = isset($payload['trackNumber']) ? (int) $payload['trackNumber'] : null;
-        $this->composerName = isset($payload['composerName']) ? (string) $payload['composerName'] : null;
-        $this->discNumber = isset($payload['discNumber']) ? (int) $payload['discNumber'] : null;
-        $this->releaseDate = isset($payload['releaseDate']) ? (string) $payload['releaseDate'] : null;
+        $this->artistName = self::asString($payload['artistName'] ?? null);
+        $this->url = self::asString($payload['url'] ?? null);
+        $this->durationInMillis = self::asInt($payload['durationInMillis'] ?? null);
+        $this->name = self::asString($payload['name'] ?? null);
+        $this->isrc = self::asString($payload['isrc'] ?? null);
+        $this->albumName = self::asString($payload['albumName'] ?? null);
+        $this->trackNumber = self::asInt($payload['trackNumber'] ?? null);
+        $this->composerName = self::asString($payload['composerName'] ?? null);
+        $this->discNumber = self::asInt($payload['discNumber'] ?? null);
+        $this->releaseDate = self::asString($payload['releaseDate'] ?? null);
         parent::__construct(self::extractExtras($payload, self::KNOWN), $payload);
     }
 }
