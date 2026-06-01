@@ -9,7 +9,7 @@ namespace AudD;
  */
 final class Version
 {
-    public const VERSION = '1.5.11';
+    public const VERSION = '1.5.12';
 
     /**
      * @return string The User-Agent header value emitted on every request.

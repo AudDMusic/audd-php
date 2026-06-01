@@ -17,6 +17,7 @@ final class EnterpriseMatch extends ForwardCompatModel
     private const KNOWN = [
         'score', 'timecode', 'artist', 'title', 'album', 'release_date',
         'label', 'isrc', 'upc', 'song_link', 'start_offset', 'end_offset',
+        'start_seconds', 'end_seconds',
     ];
 
     /**
@@ -38,6 +39,16 @@ final class EnterpriseMatch extends ForwardCompatModel
     public readonly ?int $end_offset;
 
     /**
+     * Where this match plays in the user's file, in seconds. The enterprise
+     * `result` is a list of chunks, each tagged with its `offset` (the chunk's
+     * position in the file); the fragment-relative `start_offset`/`end_offset`
+     * (ms) are added to that file anchor to give a precise file-relative time.
+     * Null when the chunk offset was absent or unparseable.
+     */
+    public readonly ?float $start_seconds;
+    public readonly ?float $end_seconds;
+
+    /**
      * @param array<string, mixed> $payload
      */
     public function __construct(array $payload)
@@ -54,6 +65,8 @@ final class EnterpriseMatch extends ForwardCompatModel
         $this->song_link = self::asString($payload['song_link'] ?? null);
         $this->start_offset = self::asInt($payload['start_offset'] ?? null);
         $this->end_offset = self::asInt($payload['end_offset'] ?? null);
+        $this->start_seconds = self::asFloat($payload['start_seconds'] ?? null);
+        $this->end_seconds = self::asFloat($payload['end_seconds'] ?? null);
         parent::__construct(self::extractExtras($payload, self::KNOWN), $payload);
     }
 

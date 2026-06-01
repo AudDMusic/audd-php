@@ -131,6 +131,26 @@ abstract class ForwardCompatModel
     }
 
     /**
+     * Coerce an arbitrary payload value to a float, or null.
+     *
+     * Non-numeric strings, arrays, objects and null degrade to null rather
+     * than coercing to a misleading 0.0.
+     */
+    protected static function asFloat(mixed $value): ?float
+    {
+        if ($value === null) {
+            return null;
+        }
+        if (is_int($value) || is_float($value)) {
+            return (float) $value;
+        }
+        if (is_string($value) && is_numeric($value)) {
+            return (float) $value;
+        }
+        return null;
+    }
+
+    /**
      * Coerce an arbitrary payload value to a bool, or null.
      */
     protected static function asBool(mixed $value): ?bool

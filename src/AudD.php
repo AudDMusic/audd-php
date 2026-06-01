@@ -321,6 +321,9 @@ final class AudD
     ): array {
         $reopen = Source::prepare($source);
         $ret = self::formatReturn($return_metadata);
+        // Accurate offsets are on by default — the file-relative start_seconds /
+        // end_seconds are only as precise as the server's offsets allow. The
+        // caller can still opt out by passing accurateOffsets: false explicitly.
         $extra = self::buildEnterpriseFields(
             $ret,
             $skip,
@@ -328,7 +331,7 @@ final class AudD
             $limit,
             $skipFirstSeconds,
             $useTimecode,
-            $accurateOffsets,
+            $accurateOffsets ?? true,
         );
         $url = self::ENTERPRISE_BASE . '/';
 
@@ -395,10 +398,21 @@ final class AudD
             if (!is_array($songs)) {
                 continue;
             }
+            $base = self::offsetToSeconds(self::asOptString($chunk['offset'] ?? null));
             foreach ($songs as $song) {
-                if (is_array($song)) {
-                    $out[] = new EnterpriseMatch($song);
+                if (!is_array($song)) {
+                    continue;
                 }
+                if ($base !== null) {
+                    // Anchor the fragment-relative ms offsets to the chunk's
+                    // position in the user's file. Default to 0 ms within the
+                    // fragment when the raw offsets are absent.
+                    $start = self::asOptInt($song['start_offset'] ?? null) ?? 0;
+                    $end = self::asOptInt($song['end_offset'] ?? null) ?? 0;
+                    $song['start_seconds'] = $base + $start / 1000;
+                    $song['end_seconds'] = $base + $end / 1000;
+                }
+                $out[] = new EnterpriseMatch($song);
             }
         }
         return $out;
@@ -516,5 +530,61 @@ final class AudD
             $fields['accurate_offsets'] = $accurateOffsets ? 'true' : 'false';
         }
         return $fields;
+    }
+
+    /**
+     * Parse a chunk `offset` to seconds. Accepts "SS", "MM:SS", "HH:MM:SS" or a
+     * bare numeric (seconds). Returns null on anything unparseable. Never throws.
+     */
+    private static function offsetToSeconds(?string $offset): ?float
+    {
+        if ($offset === null) {
+            return null;
+        }
+        $offset = trim($offset);
+        if ($offset === '') {
+            return null;
+        }
+        if (str_contains($offset, ':')) {
+            $parts = explode(':', $offset);
+            if (count($parts) > 3) {
+                return null;
+            }
+            $total = 0.0;
+            foreach ($parts as $part) {
+                $part = trim($part);
+                if ($part === '' || !is_numeric($part)) {
+                    return null;
+                }
+                $total = $total * 60 + (float) $part;
+            }
+            return $total;
+        }
+        return is_numeric($offset) ? (float) $offset : null;
+    }
+
+    private static function asOptString(mixed $value): ?string
+    {
+        if (is_string($value)) {
+            return $value;
+        }
+        if (is_int($value) || is_float($value)) {
+            return (string) $value;
+        }
+        return null;
+    }
+
+    private static function asOptInt(mixed $value): ?int
+    {
+        if (is_int($value)) {
+            return $value;
+        }
+        if (is_float($value)) {
+            return (int) $value;
+        }
+        if (is_string($value) && is_numeric($value)) {
+            return (int) $value;
+        }
+        return null;
     }
 }

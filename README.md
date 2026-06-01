@@ -105,7 +105,7 @@ echo $result->previewUrl(), "\n";      // first preview across requested provide
 
 Valid `return_metadata` values: `apple_music`, `spotify`, `deezer`, `napster`, `musicbrainz`. The corresponding properties (`$result->apple_music`, `$result->spotify`, …) are `null` when not requested.
 
-`EnterpriseMatch` (returned by `recognizeEnterprise`) carries the same core tags plus `score`, `start_offset`, `end_offset`, `isrc`, `upc`. Access to `isrc`, `upc`, and `score` requires a Startup plan or higher — [contact us](mailto:api@audd.io) for enterprise features.
+`EnterpriseMatch` (returned by `recognizeEnterprise`) carries the same core tags plus `score`, `isrc`, `upc`. It also tells you where the song plays in the file: `start_seconds` and `end_seconds` are the match's position in your file, in seconds. These are precise because `recognizeEnterprise` requests accurate offsets by default (pass `accurateOffsets: false` to turn that off). Behind them, `start_offset` and `end_offset` are the raw fragment-relative offsets in milliseconds. Access to `isrc`, `upc`, and `score` requires a Startup plan or higher — [contact us](mailto:api@audd.io) for enterprise features.
 
 ## Reading additional metadata
 
