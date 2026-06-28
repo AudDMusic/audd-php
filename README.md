@@ -1,5 +1,6 @@
 # audd-php
 
+[![Powered by AudD](https://img.shields.io/badge/Music_Recognition-AudD_API-2a4eef)](https://audd.io)
 [![CI](https://github.com/AudDMusic/audd-php/actions/workflows/ci.yml/badge.svg)](https://github.com/AudDMusic/audd-php/actions/workflows/ci.yml)
 [![Contract](https://github.com/AudDMusic/audd-php/actions/workflows/contract.yml/badge.svg)](https://github.com/AudDMusic/audd-php/actions/workflows/contract.yml)
 [![Packagist](https://img.shields.io/packagist/v/audd/audd.svg)](https://packagist.org/packages/audd/audd)
