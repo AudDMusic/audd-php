@@ -13,7 +13,7 @@ The API itself is so simple that it can easily be used even without an SDK: [doc
 ## Quickstart
 
 ```bash
-composer require audd/audd:^1.5.14
+composer require audd/audd:^1.5.15
 ```
 
 Get your API token at [dashboard.audd.io](https://dashboard.audd.io).
@@ -230,17 +230,18 @@ $audd = new AudD(
 
 **Custom HTTP client.** `httpClient` accepts any `Psr\Http\Client\ClientInterface`. Inject a configured Guzzle client, a Symfony PSR-18 adapter, or your own transport to add proxies, mTLS, custom CA bundles, or shared connection pools.
 
-When you inject your own PSR-18 client, configure connect/read timeouts on that client directly. PSR-18 has no way to express a per-request timeout, so the `timeout:` argument and the built-in enterprise defaults apply only to the SDK's own Guzzle transport (used when you don't pass a `httpClient`). For long enterprise uploads on a custom client, set a generous read timeout — up to an hour — when you build it.
+If the client you inject is a Guzzle client, the SDK passes its timeouts as per-request options, so the `timeout:` argument and the built-in enterprise defaults still apply. Any other PSR-18 client has no channel for per-request timeouts — configure connect/read timeouts on that client directly, and for long enterprise uploads give it a generous read timeout, up to an hour, when you build it.
 
 **Retries.** Calls are classified by cost and retried accordingly:
 
-| Class         | Endpoints                                                                              | Retried on                                                  |
-|---------------|----------------------------------------------------------------------------------------|-------------------------------------------------------------|
-| `RECOGNITION` | `recognize`, `recognizeEnterprise`, `advanced->*`                                      | network errors and 5xx **before** the upload reaches server |
-| `READ`        | `streams->list`, `streams->getCallbackUrl`, longpoll                                   | network errors and 5xx                                      |
-| `MUTATING`    | `streams->setCallbackUrl`, `streams->add`, `streams->delete`, `customCatalog->add`     | network errors and 5xx (idempotent on the server)           |
+| Class         | Endpoints                                                    | Retried on                                                                              |
+|---------------|--------------------------------------------------------------|-----------------------------------------------------------------------------------------|
+| `RECOGNITION` | `recognize`, `recognizeEnterprise`, `advanced->*`            | failures to establish the connection, and 5xx responses                                 |
+| `READ`        | `streams->list`, `streams->getCallbackUrl`, longpoll         | any network error, plus 408, 429, and 5xx                                               |
+| `MUTATING`    | `streams->setCallbackUrl`, `streams->add`, `streams->delete` | failures to establish the connection — never 5xx (the change may already have been applied) |
+| `NONE`        | `customCatalog->add`                                         | never retried — the upload is metered, and re-sending it could double-bill              |
 
-`RECOGNITION` will not double-bill your account: once the server has accepted bytes, a 5xx after that is surfaced rather than retried.
+`RECOGNITION` will not double-bill your account: any failure after the connection is up and the upload is in flight is surfaced rather than retried, because the server may already be processing the audio.
 
 **Inspection.** Pass an `onEvent` closure to receive an `AudDEvent` for every request / response / exception — useful for metrics, distributed tracing, or attaching `requestId` to your application logs. Events never carry the api_token or request bytes; exceptions raised from the hook are swallowed and routed through the PSR-3 logger at `debug` level so observability can't break the request path.
 
