@@ -107,8 +107,10 @@ abstract class ForwardCompatModel
     /**
      * Coerce an arbitrary payload value to an int, or null.
      *
-     * Non-numeric strings, arrays, objects and null degrade to null rather
-     * than coercing to a misleading 0.
+     * Floats truncate; numeric strings (plain or scientific decimal,
+     * full-string after trimming) parse. Non-numeric strings, out-of-range
+     * values, arrays, objects and null degrade to null rather than coercing
+     * to a misleading 0.
      */
     protected static function asInt(mixed $value): ?int
     {
@@ -121,10 +123,28 @@ abstract class ForwardCompatModel
         if (is_bool($value)) {
             return (int) $value;
         }
-        if (is_float($value)) {
-            return (int) $value;
-        }
         if (is_string($value) && is_numeric($value)) {
+            $s = trim($value);
+            if (preg_match('/^[+-]?[0-9]+$/', $s) === 1) {
+                // Plain integer string: exact cast, but reject out-of-range
+                // instead of silently saturating at PHP_INT_MIN/MAX.
+                $int = (int) $s;
+                if (($int === PHP_INT_MAX || $int === PHP_INT_MIN) && (string) $int !== $s) {
+                    return null;
+                }
+                return $int;
+            }
+            $value = (float) $s;
+        }
+        if (is_float($value)) {
+            // Truncate — but never emit a garbage int for values an int
+            // can't represent (overflowing exponents, INF, NAN).
+            if (!is_finite($value)
+                || $value < (float) PHP_INT_MIN
+                || $value >= (float) PHP_INT_MAX
+            ) {
+                return null;
+            }
             return (int) $value;
         }
         return null;
@@ -145,13 +165,21 @@ abstract class ForwardCompatModel
             return (float) $value;
         }
         if (is_string($value) && is_numeric($value)) {
-            return (float) $value;
+            $f = (float) $value;
+            // Overflowing exponents ("1e999") produce INF — degrade to null
+            // rather than shipping a non-finite float.
+            return is_finite($f) ? $f : null;
         }
         return null;
     }
 
     /**
      * Coerce an arbitrary payload value to a bool, or null.
+     *
+     * Numbers map to `!= 0`. Strings map through a strict whitelist
+     * (case-insensitive, trimmed): "true"/"1"/"yes"/"on" are true,
+     * ""/"false"/"0"/"no"/"off" are false — any other string degrades to
+     * null rather than guessing.
      */
     protected static function asBool(mixed $value): ?bool
     {
@@ -166,10 +194,13 @@ abstract class ForwardCompatModel
         }
         if (is_string($value)) {
             $v = strtolower(trim($value));
-            if ($v === '' || $v === 'false' || $v === '0' || $v === 'no') {
+            if ($v === 'true' || $v === '1' || $v === 'yes' || $v === 'on') {
+                return true;
+            }
+            if ($v === '' || $v === 'false' || $v === '0' || $v === 'no' || $v === 'off') {
                 return false;
             }
-            return true;
+            return null;
         }
         return null;
     }
