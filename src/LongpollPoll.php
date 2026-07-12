@@ -32,13 +32,14 @@ use GuzzleHttp\Exception\TransferException;
  * $poll->run();
  * ```
  *
- * Keepalive responses (`{"timeout":"no events before timeout", ...}`) are
- * silently absorbed: the loop advances `since_time` and continues.
+ * Keepalive responses — any body carrying neither a `result` nor a
+ * `notification` block, such as `{"timeout":"no events before timeout", ...}` —
+ * are silently absorbed: the loop advances `since_time` and continues.
  *
- * Hardening (mirror of audd-go runLongpoll):
+ * Failure handling:
  *   - HTTP non-2xx → AudDServerException → onError, then loop terminates.
  *   - JSON decode failure on 2xx → AudDSerializationException → onError, terminate.
- *   - 5xx + connection errors are retried via the READ-class retry policy.
+ *   - 5xx and connection errors are retried via the READ-class retry policy.
  */
 final class LongpollPoll
 {
@@ -145,7 +146,7 @@ final class LongpollPoll
             /** @var array<string, mixed> $body */
 
             // Advance since_time from the response timestamp regardless of
-            // event type — mirrors audd-go's runLongpoll.
+            // event type, so the next poll resumes after the last seen event.
             $ts = $body['timestamp'] ?? null;
             if (is_int($ts)) {
                 $this->params['since_time'] = (string) $ts;
@@ -173,7 +174,9 @@ final class LongpollPoll
     private function fetchOnce(): HttpResponse
     {
         $do = function (): HttpResponse {
-            return $this->http->get($this->url, $this->params);
+            // The longpoll endpoint authorizes via the derived category alone —
+            // never send the api_token in the query string here.
+            return $this->http->get($this->url, $this->params, sendToken: false);
         };
         try {
             return $this->policy->run($do);
@@ -202,13 +205,15 @@ final class LongpollPoll
     }
 
     /**
+     * A longpoll response carrying neither a `result` nor a `notification`
+     * block is a benign keepalive (the server emits one when no event happened
+     * within the poll window). Absorb it and keep polling rather than treating
+     * it as a terminal serialization error.
+     *
      * @param array<string, mixed> $body
      */
     private static function isLongpollKeepalive(array $body): bool
     {
-        if (isset($body['result']) || isset($body['notification'])) {
-            return false;
-        }
-        return array_key_exists('timeout', $body);
+        return !isset($body['result']) && !isset($body['notification']);
     }
 }

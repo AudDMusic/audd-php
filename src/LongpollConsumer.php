@@ -27,11 +27,11 @@ use Psr\Http\Client\ClientInterface;
  * $poll->run();
  * ```
  *
- * Hardening (mirror of audd-go's tokenless LongpollConsumer):
+ * Failure handling:
  *   - HTTP non-2xx → AudDServerException via the registered onError handler.
  *   - JSON decode failure on 2xx → AudDSerializationException.
  *   - READ-class retries on 5xx + connection errors with configurable
- *     `maxRetries` / `backoffFactor` for parity with the authenticated client.
+ *     `maxRetries` / `backoffFactor`, matching the authenticated client.
  */
 final class LongpollConsumer
 {

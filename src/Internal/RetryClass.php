@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace AudD\Internal;
 
 /**
- * Cost-aware retry policy. See design spec §7.1.
+ * Cost-aware retry policy.
  *
  * READ        — idempotent reads (streams.list, getCallbackUrl): retry on
  *               408/429/5xx + any connection error.

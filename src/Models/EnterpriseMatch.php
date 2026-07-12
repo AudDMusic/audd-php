@@ -10,7 +10,7 @@ use AudD\StreamingProvider;
  * One match from the enterprise endpoint. Carries score + offset bounds.
  *
  * Streaming URLs are lis.tn-only: enterprise responses don't carry per-provider
- * metadata blocks, so there's no direct-URL fallback. Spec §4.3.
+ * metadata blocks, so there's no direct-URL fallback.
  */
 final class EnterpriseMatch extends ForwardCompatModel
 {
@@ -88,7 +88,7 @@ final class EnterpriseMatch extends ForwardCompatModel
 
     /**
      * All five providers' lis.tn redirect URLs. Empty array when `song_link`
-     * is not on `lis.tn`. Spec §4.3.
+     * is not on `lis.tn`.
      *
      * @return array<string, string>
      */

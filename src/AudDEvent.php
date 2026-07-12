@@ -7,7 +7,7 @@ namespace AudD;
 /**
  * Inspection event emitted by the SDK request lifecycle.
  *
- * Spec §7.7a. Hooks receive these via the `onEvent` callback passed to
+ * Hooks receive these via the `onEvent` callback passed to
  * `\AudD\AudD::__construct`. Plain readonly data class — never includes the
  * api_token or request body bytes.
  */

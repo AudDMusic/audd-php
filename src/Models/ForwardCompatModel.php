@@ -7,7 +7,7 @@ namespace AudD\Models;
 /**
  * Base for every typed model. Forward-compat: every model accepts and round-trips
  * unknown server fields via the `$extras` array, accessed transparently via __get
- * for fields the typed surface doesn't yet know about. See design spec §5.2.
+ * for fields the typed surface doesn't yet know about.
  */
 abstract class ForwardCompatModel
 {

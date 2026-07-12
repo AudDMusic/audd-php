@@ -9,7 +9,6 @@ use AudD\Errors\AudDInvalidRequestException;
 use AudD\Errors\AudDSerializationException;
 use AudD\Helpers;
 use AudD\Models\StreamCallbackMatch;
-use AudD\Models\StreamCallbackNotification;
 use AudD\Streams;
 use GuzzleHttp\Psr7\ServerRequest;
 use PHPUnit\Framework\TestCase;
@@ -117,6 +116,43 @@ final class StreamsTest extends TestCase
         self::assertStringContainsString('category=' . $expectedCategory, $longpollUri);
     }
 
+    public function testLongpollRequestNeverSendsApiToken(): void
+    {
+        $mock = new MockHttp();
+        // Preflight (getCallbackUrl) succeeds, then a keepalive, then a match.
+        $mock->handler->append(MockHttp::jsonResponse(200, [
+            'status' => 'success', 'result' => 'https://my.app/cb',
+        ]));
+        $mock->handler->append(MockHttp::jsonResponse(200, [
+            'timeout' => 'no events before timeout',
+            'timestamp' => 1234567,
+        ]));
+        $mock->handler->append(MockHttp::jsonResponse(200, [
+            'time' => 1234600,
+            'timestamp' => 1234600,
+            'result' => [
+                'radio_id' => 1, 'timestamp' => '2020-04-13 10:31:43', 'play_length' => 10,
+                'results' => [['artist' => 'A', 'title' => 'B', 'score' => 100]],
+            ],
+        ]));
+        $audd = new AudD(apiToken: 'super-secret-token', httpClient: $mock->buildClient());
+
+        $poll = $audd->streams()->longpoll(radioId: 1);
+        $poll->onMatch(function (StreamCallbackMatch $m) use ($poll): void {
+            $poll->close();
+        });
+        $poll->run();
+
+        // Every longpoll GET (indices 1 and 2; index 0 is the POST preflight)
+        // must omit the api_token entirely — the derived category authorizes it.
+        for ($i = 1; $i < count($mock->history); $i++) {
+            $uri = (string) $mock->history[$i]['request']->getUri();
+            self::assertStringContainsString('/longpoll/', $uri);
+            self::assertStringNotContainsString('api_token', $uri);
+            self::assertStringNotContainsString('super-secret-token', $uri);
+        }
+    }
+
     public function testLongpollKeywordCategoryFormWorks(): void
     {
         $mock = new MockHttp();
@@ -185,6 +221,46 @@ final class StreamsTest extends TestCase
             $poll->close(); // stop after first match
         });
         $poll->run();
+        self::assertCount(1, $matches);
+        self::assertSame('A', $matches[0]->song->artist);
+    }
+
+    public function testLongpollTreatsUnknownBodyAsKeepalive(): void
+    {
+        $mock = new MockHttp();
+        // A body with neither `result` nor `notification` and no `timeout` key
+        // is still a benign keepalive — the loop must continue polling, not
+        // terminate with a serialization error.
+        $mock->handler->append(MockHttp::jsonResponse(200, [
+            'something' => 'else',
+            'timestamp' => 1234567,
+        ]));
+        // An empty object is likewise a keepalive.
+        $mock->handler->append(MockHttp::jsonResponse(200, []));
+        // Then a real match arrives.
+        $mock->handler->append(MockHttp::jsonResponse(200, [
+            'time' => 1234600,
+            'timestamp' => 1234600,
+            'result' => [
+                'radio_id' => 1, 'timestamp' => '2020-04-13 10:31:43', 'play_length' => 10,
+                'results' => [['artist' => 'A', 'title' => 'B', 'score' => 100]],
+            ],
+        ]));
+        $audd = new AudD(apiToken: 'test', httpClient: $mock->buildClient());
+
+        $poll = $audd->streams()->longpoll('cat', skipCallbackCheck: true);
+        $matches = [];
+        $errors = [];
+        $poll->onMatch(function (StreamCallbackMatch $m) use ($poll, &$matches): void {
+            $matches[] = $m;
+            $poll->close();
+        });
+        $poll->onError(function (\Throwable $e) use (&$errors): void {
+            $errors[] = $e;
+        });
+        $poll->run();
+
+        self::assertSame([], $errors, 'keepalive bodies must not surface as errors');
         self::assertCount(1, $matches);
         self::assertSame('A', $matches[0]->song->artist);
     }

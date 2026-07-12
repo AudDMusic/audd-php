@@ -13,7 +13,7 @@ The API itself is so simple that it can easily be used even without an SDK: [doc
 ## Quickstart
 
 ```bash
-composer require audd/audd:^1.5.7
+composer require audd/audd:^1.5.13
 ```
 
 Get your API token at [dashboard.audd.io](https://dashboard.audd.io).
@@ -42,7 +42,7 @@ if ($result !== null) {
 }
 ```
 
-`recognize()` accepts a URL, a filesystem path, a PSR-7 `StreamInterface`, a `resource` handle, or raw bytes wrapped via `AudD\Internal\Source::bytes($buf)` — auto-detected. It returns a `RecognitionResult` on a match, or `null` when the clip isn't recognized.
+`recognize()` accepts a URL, a filesystem path, a PSR-7 `StreamInterface`, a `resource` handle, or raw bytes wrapped via `AudD::bytes($buf)` — auto-detected. It returns a `RecognitionResult` on a match, or `null` when the clip isn't recognized.
 
 For longer audio files (full-length songs, short-form videos, podcasts, broadcasts, DJ sets), use `recognizeEnterprise($source, limit: ...)` — it returns `list<EnterpriseMatch>`, one per song detected across the file.
 
@@ -229,6 +229,8 @@ $audd = new AudD(
 ```
 
 **Custom HTTP client.** `httpClient` accepts any `Psr\Http\Client\ClientInterface`. Inject a configured Guzzle client, a Symfony PSR-18 adapter, or your own transport to add proxies, mTLS, custom CA bundles, or shared connection pools.
+
+When you inject your own PSR-18 client, configure connect/read timeouts on that client directly. PSR-18 has no way to express a per-request timeout, so the `timeout:` argument and the built-in enterprise defaults apply only to the SDK's own Guzzle transport (used when you don't pass a `httpClient`). For long enterprise uploads on a custom client, set a generous read timeout — up to an hour — when you build it.
 
 **Retries.** Calls are classified by cost and retried accordingly:
 

@@ -11,6 +11,12 @@ use GuzzleHttp\RequestOptions;
  * Build a PSR-7 request from Guzzle-style options for the case where a user
  * injected their own PSR-18 client.
  *
+ * Timeouts are intentionally not translated here: a PSR-7 request carries no
+ * timeout channel, and PSR-18 leaves per-request timeouts entirely to the
+ * client implementation. Callers who inject their own PSR-18 client configure
+ * connect/read timeouts on that client; the SDK's `timeout:` argument and the
+ * enterprise defaults apply to the built-in Guzzle transport.
+ *
  * @internal
  */
 final class PsrRequestBuilder

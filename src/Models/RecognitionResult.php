@@ -11,7 +11,7 @@ use AudD\StreamingProvider;
  * custom-DB matches expose audio_id only — both share `timecode`.
  *
  * Forward compat: any unknown server field is exposed via `$extras` and
- * via direct property access (`$result->newField`). See spec §5.
+ * via direct property access (`$result->newField`).
  */
 final class RecognitionResult extends ForwardCompatModel
 {
@@ -111,8 +111,6 @@ final class RecognitionResult extends ForwardCompatModel
      *     is on `lis.tn`. Works regardless of whether `return=` was set.
      *  3. `null` otherwise (e.g., YouTube `song_link` and the user didn't
      *     request the provider's metadata). YouTube has only the lis.tn path.
-     *
-     * Spec §4.3.
      */
     public function streamingUrl(StreamingProvider $provider): ?string
     {
@@ -128,7 +126,7 @@ final class RecognitionResult extends ForwardCompatModel
      *
      * Returns an associative array keyed by provider value (`"spotify"`,
      * `"apple_music"`, `"deezer"`, `"napster"`, `"youtube"`). Empty array
-     * when neither path resolves for any provider. Spec §4.3.
+     * when neither path resolves for any provider.
      *
      * @return array<string, string>
      */

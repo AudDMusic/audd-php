@@ -13,7 +13,7 @@
     },
     "authors": [
         {
-            "name": "AudD",
+            "name": "AudD, LLC (https://audd.io)",
             "email": "api@audd.io",
             "homepage": "https://audd.io"
         }
@@ -57,7 +57,7 @@
     },
     "extra": {
         "branch-alias": {
-            "dev-main": "1.4.x-dev"
+            "dev-main": "1.5.x-dev"
         }
     },
     "minimum-stability": "stable"

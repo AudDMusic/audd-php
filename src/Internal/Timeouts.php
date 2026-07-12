@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace AudD\Internal;
 
 /**
- * Default timeouts in seconds. Values mirror the design spec §7.2.
+ * Default timeouts in seconds.
  *
  * @internal
  */

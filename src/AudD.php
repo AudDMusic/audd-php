@@ -26,7 +26,7 @@ use Psr\Log\NullLogger;
  *
  * Quickstart:
  * ```php
- * $audd = new \AudD\AudD(apiToken: 'test');
+ * $audd = new \AudD\AudD(apiToken: 'your-api-token');
  * $r = $audd->recognize('https://audd.tech/example.mp3');
  * if ($r !== null) {
  *     echo $r->artist . ' — ' . $r->title;
@@ -42,7 +42,7 @@ final class AudD
     private const ENTERPRISE_BASE = 'https://enterprise.audd.io';
 
     /**
-     * Environment variable consulted when apiToken is null/empty. Spec §7.11.
+     * Environment variable consulted when apiToken is null/empty.
      */
     public const TOKEN_ENV_VAR = 'AUDD_API_TOKEN';
 
@@ -70,13 +70,13 @@ final class AudD
      * The api_token may be omitted (`null` or empty string); in that case the
      * SDK reads the `AUDD_API_TOKEN` environment variable. If neither is set,
      * an `AudDConfigurationException` is thrown — pointing the user to
-     * https://dashboard.audd.io for a token. Spec §7.11.
+     * https://dashboard.audd.io for a token.
      *
      * @param \Closure(AudDEvent): void|null $onEvent Optional inspection hook
      *  invoked with `Request`/`Response`/`Exception` events around every
      *  recognize / recognizeEnterprise call. Hook exceptions are swallowed and
      *  routed through `$logger->debug(...)`. The event payload never includes
-     *  the api_token or request body bytes. Spec §7.7a.
+     *  the api_token or request body bytes.
      * @param LoggerInterface|null $logger Optional PSR-3 logger. When supplied
      *  the SDK emits diagnostic records — onEvent hook failures at `debug`
      *  level, deprecated-parameter (server code 51) notices at `warning`
@@ -144,7 +144,7 @@ final class AudD
     /**
      * Rotate the api_token used for subsequent requests. PHP is single-threaded
      * per request so no lock is needed — in-flight requests already hold the
-     * value they were started with on the cURL handle. Spec §7.10.
+     * value they were started with on the cURL handle.
      *
      * @throws AudDConfigurationException If `$newToken` is empty.
      */
@@ -183,6 +183,20 @@ final class AudD
         );
     }
 
+    /**
+     * Wrap a binary string so `recognize(...)` / `recognizeEnterprise(...)` /
+     * `customCatalog()->add(...)` treat it as raw audio bytes rather than a URL
+     * or a filesystem path.
+     *
+     * ```php
+     * $result = $audd->recognize(AudD::bytes($clipBytes));
+     * ```
+     */
+    public static function bytes(string $bytes): SourceBytes
+    {
+        return Source::bytes($bytes);
+    }
+
     public function streams(): Streams
     {
         return $this->streamsNamespace ??= new Streams(
@@ -205,7 +219,8 @@ final class AudD
 
     public function advanced(): Advanced
     {
-        // Locked pattern C2: Advanced uses RECOGNITION retry policy.
+        // Advanced calls (e.g. findLyrics) are metered like recognize, so they
+        // use the RECOGNITION retry policy.
         return $this->advancedNamespace ??= new Advanced(
             $this->http,
             $this->recognitionPolicy(),
@@ -214,7 +229,7 @@ final class AudD
 
     /**
      * Recognize a (≤25s) audio sample by URL, file path, PSR-7 stream,
-     * resource handle, or wrapped raw bytes (Source::bytes($buf)).
+     * resource handle, or wrapped raw bytes (AudD::bytes($buf)).
      *
      * Returns null when the server returned status=success with result=null
      * (no match found) — distinct from raising an error.
@@ -432,7 +447,7 @@ final class AudD
     /**
      * Invoke `onEvent` swallowing any exception so observability never breaks
      * the request path. Hook errors are routed through the PSR-3 logger at
-     * `debug` level (defaults to `NullLogger` — silent). Spec §7.7a.
+     * `debug` level (defaults to `NullLogger` — silent).
      */
     private function safeEmit(AudDEvent $event): void
     {

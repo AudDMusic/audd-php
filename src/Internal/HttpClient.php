@@ -24,7 +24,7 @@ use Psr\Http\Message\StreamInterface;
  *
  * Owned-vs-injected: when the caller passes a PSR-18 client, the wrapper does
  * NOT close it on `close()`. When it manufactures a Guzzle client itself, it
- * does — preventing connection-pool leaks via __destruct. Design spec §7.4a.
+ * does — preventing connection-pool leaks via __destruct.
  *
  * @internal
  */
@@ -37,7 +37,7 @@ final class HttpClient
 
     private bool $closed = false;
 
-    /** Mutable: rotated by AudD::setApiToken() at runtime. Spec §7.10. */
+    /** Mutable: rotated by AudD::setApiToken() at runtime. */
     private string $apiToken;
 
     public function __construct(
@@ -105,17 +105,23 @@ final class HttpClient
     }
 
     /**
-     * GET with api_token + params merged into the query string.
+     * GET with params merged into the query string.
      *
-     * If apiToken is the empty string (tokenless mode used by LongpollConsumer),
-     * no api_token is added to the query.
+     * The api_token is appended only when `$sendToken` is true and the token is
+     * non-empty. Pass `sendToken: false` for endpoints that must not receive the
+     * token in the query string (e.g. the longpoll endpoint, which authorizes
+     * via the derived category alone and rejects a token parameter).
      *
      * @param array<string, scalar> $params
      */
-    public function get(string $url, array $params, ?float $perCallTimeout = null): HttpResponse
-    {
+    public function get(
+        string $url,
+        array $params,
+        ?float $perCallTimeout = null,
+        bool $sendToken = true,
+    ): HttpResponse {
         $full = $params;
-        if (!isset($full['api_token']) && $this->apiToken !== '') {
+        if ($sendToken && !isset($full['api_token']) && $this->apiToken !== '') {
             $full['api_token'] = $this->apiToken;
         }
         $options = $this->baseOptions($perCallTimeout);

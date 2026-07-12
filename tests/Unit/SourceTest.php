@@ -4,12 +4,27 @@ declare(strict_types=1);
 
 namespace AudD\Tests\Unit;
 
+use AudD\AudD;
 use AudD\Internal\Source;
+use AudD\Internal\SourceBytes;
 use GuzzleHttp\Psr7\Utils;
 use PHPUnit\Framework\TestCase;
 
 final class SourceTest extends TestCase
 {
+    public function testPublicBytesEntryPointWrapsRawBytes(): void
+    {
+        $wrapped = AudD::bytes("\x00\x01raw-audio");
+        self::assertInstanceOf(SourceBytes::class, $wrapped);
+
+        // The wrapper routes through the multipart 'file' part unchanged.
+        $reopen = Source::prepare($wrapped);
+        [$data, $files] = $reopen();
+        self::assertSame([], $data);
+        self::assertNotNull($files);
+        self::assertSame("\x00\x01raw-audio", $files[0]['contents']);
+    }
+
     public function testUrlSourceReturnsUrlField(): void
     {
         $reopen = Source::prepare('https://example.com/track.mp3');
@@ -71,7 +86,7 @@ final class SourceTest extends TestCase
     public function testStringNeitherUrlNorFileRaisesInvalidArgument(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessageMatches('/Source::bytes/');
+        $this->expectExceptionMessageMatches('/AudD::bytes/');
         Source::prepare('definitely-not-a-real-path-or-url');
     }
 

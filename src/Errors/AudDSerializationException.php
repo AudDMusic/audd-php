@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace AudD\Errors;
 
 /**
- * Server returned malformed JSON in a 2xx response. (Non-JSON in non-2xx
- * is mapped to AudDServerException — see design spec §6.6.)
+ * Server returned malformed JSON in a 2xx response. (Non-JSON in a non-2xx
+ * response is mapped to AudDServerException instead.)
  */
 final class AudDSerializationException extends AudDException
 {

@@ -74,7 +74,7 @@ final class ResponseDecoder
      * If body carries a code-51 deprecation warning + a usable result,
      * emit a PHP-native E_USER_DEPRECATED notice, mirror it on the optional
      * PSR-3 logger at `warning` level, and rewrite the body to look like a
-     * normal success response. See spec §6.5 / locked pattern C3.
+     * normal success response.
      *
      * @param array<string, mixed> $body
      */

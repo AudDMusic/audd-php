@@ -6,8 +6,7 @@ namespace AudD;
 
 /**
  * Streaming providers reachable via the lis.tn `?<provider>` redirect helper
- * and (for some) via direct URLs in the per-provider metadata blocks. See
- * design spec §4.3.
+ * and (for some) via direct URLs in the per-provider metadata blocks.
  *
  * Backed by string values matching AudD's lis.tn redirect query keys so the
  * enum value can be appended directly: `"$songLink?{$provider->value}"`.

@@ -6,7 +6,7 @@ namespace AudD\Internal;
 
 /**
  * Wrapper signaling "this string is raw audio bytes, not a URL or file path."
- * Use Source::bytes($bytes) to construct.
+ * Construct it via the public `AudD::bytes($bytes)` entry point.
  *
  * @internal
  */

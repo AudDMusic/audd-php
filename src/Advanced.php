@@ -14,11 +14,7 @@ use GuzzleHttp\Exception\TransferException;
 
 /**
  * Advanced namespace — lyrics search and a generic raw-request escape hatch.
- * Reached only via `$audd->advanced->...`.
- *
- * Note: the locked pattern requires Advanced to use the RECOGNITION retry
- * policy (find_lyrics is metered; spec §7.1 puts it in the same cost class
- * as recognize).
+ * Reached only via `$audd->advanced()->...`.
  */
 final class Advanced
 {

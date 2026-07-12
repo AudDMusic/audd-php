@@ -63,6 +63,37 @@ final class EnterpriseOffsetsTest extends TestCase
         self::assertArrayNotHasKey('end_seconds', $matches[0]->extras);
     }
 
+    public function testChunkOffsetOverOneHourAnchorsSeconds(): void
+    {
+        $mock = new MockHttp();
+        $mock->handler->append(MockHttp::jsonResponse(200, [
+            'status' => 'success',
+            'result' => [
+                [
+                    // HH:MM:SS beyond one hour: 1h + 2m + 3s = 3723s.
+                    'offset' => '01:02:03',
+                    'songs' => [
+                        [
+                            'artist' => 'A',
+                            'title' => 'One',
+                            'timecode' => '00:04',
+                            'start_offset' => 0,
+                            'end_offset' => 2000,
+                        ],
+                    ],
+                ],
+            ],
+        ]));
+
+        $audd = new AudD(apiToken: 'test', httpClient: $mock->buildClient());
+        $matches = $audd->recognizeEnterprise('https://audd.tech/long.mp3');
+
+        self::assertCount(1, $matches);
+        // 3723s chunk base + 0ms/2000ms fragment-relative offsets.
+        self::assertEqualsWithDelta(3723.0, $matches[0]->start_seconds, 0.0001);
+        self::assertEqualsWithDelta(3725.0, $matches[0]->end_seconds, 0.0001);
+    }
+
     public function testAccurateOffsetsDefaultsTrue(): void
     {
         $mock = new MockHttp();

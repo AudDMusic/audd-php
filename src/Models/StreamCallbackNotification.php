@@ -6,10 +6,10 @@ namespace AudD\Models;
 
 /**
  * Lifecycle-event variant of a stream callback (e.g. "stream stopped",
- * "can't connect"). The notification block lives under `notification.*`;
- * the outer body carries an additional `time` field which the constructor
- * accepts via the inner-array `__time` slot or — preferred — via the
- * `$outerTime` constructor argument.
+ * "can't connect"). The notification fields live under `notification.*`; the
+ * outer callback body carries an additional `time` field (unix seconds), which
+ * the constructor receives via the `$outerTime` argument and exposes as the
+ * public `$time` property.
  */
 final class StreamCallbackNotification extends ForwardCompatModel
 {

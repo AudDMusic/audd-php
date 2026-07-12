@@ -14,7 +14,7 @@ use GuzzleHttp\Exception\TransferException;
 use Psr\Http\Message\StreamInterface;
 
 /**
- * Custom-catalog endpoint. Reached via `$audd->customCatalog->...`.
+ * Custom-catalog endpoint. Reached via `$audd->customCatalog()->...`.
  *
  * NOT for music recognition — see `add()` method docstring.
  */

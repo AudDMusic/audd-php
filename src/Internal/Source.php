@@ -22,8 +22,7 @@ use Psr\Http\Message\StreamInterface;
  *   - file path string (existing file): routed via `multipart` 'file' part
  *   - StreamInterface (PSR-7 stream):  routed via `multipart` 'file' part
  *   - resource (PHP stream):           routed via `multipart` 'file' part
- *   - raw bytes (string starting with non-URL prefix is treated as path then bytes)
- *   - bytes wrapped via SourceBytes::raw($bytes) for unambiguous raw-bytes intent
+ *   - raw bytes wrapped via AudD::bytes($bytes) for unambiguous raw-bytes intent
  *
  * Unseekable streams: a retry will fail loudly rather than silently sending an
  * empty body.
@@ -34,7 +33,8 @@ final class Source
 {
     /**
      * Wrap a string argument so the caller can declare "this is raw bytes,
-     * not a URL or path" unambiguously.
+     * not a URL or path" unambiguously. Public callers use `AudD::bytes()`,
+     * which delegates here.
      */
     public static function bytes(string $bytes): SourceBytes
     {
@@ -84,7 +84,7 @@ final class Source
             throw new \InvalidArgumentException(
                 sprintf(
                     '%s is neither an HTTP URL (must start with http:// or https://) nor an existing '
-                    . 'file path. To pass raw bytes, wrap them with AudD\\Internal\\Source::bytes(\$bytes).',
+                    . 'file path. To pass raw bytes, wrap them with AudD\\AudD::bytes(\$bytes).',
                     self::truncate($source),
                 ),
             );
@@ -120,7 +120,7 @@ final class Source
                     if (!$seekable || $start === null) {
                         throw new \RuntimeException(
                             'Cannot retry an unseekable PSR-7 stream source. Buffer the content '
-                            . 'as raw bytes via AudD\\Internal\\Source::bytes(...) instead.',
+                            . 'as raw bytes via AudD\\AudD::bytes(...) instead.',
                         );
                     }
                     $source->seek($start);
@@ -153,7 +153,7 @@ final class Source
                     if (!$seekable || $start === null) {
                         throw new \RuntimeException(
                             'Cannot retry an unseekable resource source. Buffer the content as '
-                            . 'raw bytes via AudD\\Internal\\Source::bytes(...) instead.',
+                            . 'raw bytes via AudD\\AudD::bytes(...) instead.',
                         );
                     }
                     fseek($fl, $start);
@@ -170,7 +170,7 @@ final class Source
 
         throw new \InvalidArgumentException(
             'Unsupported source type: pass a URL string, file path, PSR-7 StreamInterface, '
-            . 'PHP resource, or wrap raw bytes via AudD\\Internal\\Source::bytes(...).',
+            . 'PHP resource, or wrap raw bytes via AudD\\AudD::bytes(...).',
         );
     }
 
