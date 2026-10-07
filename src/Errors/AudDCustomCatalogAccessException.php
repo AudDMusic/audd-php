@@ -31,8 +31,8 @@ final class AudDCustomCatalogAccessException extends AudDSubscriptionException
             . "enabled on your account.\n\n"
             . 'Note: the custom-catalog endpoint is for adding songs to your private '
             . 'fingerprint database, not for music recognition. If you intended to '
-            . 'identify music, use recognize(...) (or recognizeEnterprise(...) for '
-            . "files longer than 25 seconds) instead.\n\n"
+            . 'identify music, use recognize(...) (or recognizeEnterprise(...) to '
+            . "scan beyond the first 12 seconds of a file) instead.\n\n"
             . "To request custom-catalog access, contact api@audd.io.\n\n"
             . '[Server message: ' . $serverMessage . ']';
         parent::__construct(

@@ -228,8 +228,10 @@ final class AudD
     }
 
     /**
-     * Recognize a (≤25s) audio sample by URL, file path, PSR-7 stream,
-     * resource handle, or wrapped raw bytes (AudD::bytes($buf)).
+     * Recognize an audio sample by URL, file path, PSR-7 stream,
+     * resource handle, or wrapped raw bytes (AudD::bytes($buf)). The first
+     * 12 seconds of audio are analyzed; use recognizeEnterprise() to scan
+     * beyond that.
      *
      * Returns null when the server returned status=success with result=null
      * (no match found) — distinct from raising an error.
