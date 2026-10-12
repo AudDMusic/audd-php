@@ -13,7 +13,7 @@ The API itself is so simple that it can easily be used even without an SDK: [doc
 ## Quickstart
 
 ```bash
-composer require audd/audd:^1.5.16
+composer require audd/audd:^1.5.17
 ```
 
 Get your API token at [dashboard.audd.io](https://dashboard.audd.io).
