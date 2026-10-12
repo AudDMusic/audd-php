@@ -69,6 +69,25 @@ final class ContractTest extends TestCase
         self::assertCount(1, $matches);
         self::assertSame('GBUM71403885', $matches[0]->isrc);
         self::assertSame('00602547037169', $matches[0]->upc);
+        self::assertNull($matches[0]->audio_id);
+        self::assertTrue($matches[0]->isPublicMatch());
+        self::assertFalse($matches[0]->isCustomMatch());
+    }
+
+    public function testEnterpriseCustomMatch(): void
+    {
+        $body = FixtureLoader::load('enterprise_custom_match.json');
+        $matches = [];
+        foreach ($body['result'] as $chunk) {
+            foreach ($chunk['songs'] as $song) {
+                $matches[] = new EnterpriseMatch($song);
+            }
+        }
+        self::assertCount(1, $matches);
+        self::assertSame(146, $matches[0]->audio_id);
+        self::assertTrue($matches[0]->isCustomMatch());
+        self::assertFalse($matches[0]->isPublicMatch());
+        self::assertSame(100, $matches[0]->score);
     }
 
     public function testStreamsCallbackResultDiscriminator(): void

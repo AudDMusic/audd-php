@@ -108,6 +108,8 @@ Valid `return_metadata` values: `apple_music`, `spotify`, `deezer`, `musicbrainz
 
 `EnterpriseMatch` (returned by `recognizeEnterprise`) carries the same core tags plus `score`, `isrc`, `upc`. It also tells you where the song plays in the file: `start_seconds` and `end_seconds` are the match's position in your file, in seconds. These are precise because `recognizeEnterprise` requests accurate offsets by default (pass `accurateOffsets: false` to turn that off). Behind them, `start_offset` and `end_offset` are the raw fragment-relative offsets in milliseconds. Access to `isrc`, `upc`, and `score` requires a Startup plan or higher — [contact us](mailto:api@audd.io) for enterprise features.
 
+When a match comes from your [custom catalog](#custom-catalog-advanced), both `RecognitionResult` and `EnterpriseMatch` carry `audio_id` (the ID you uploaded the track under) instead of the public-catalog tags; `isCustomMatch()` and `isPublicMatch()` tell the two apart.
+
 ## Reading additional metadata
 
 Every typed model exposes `extras` carrying any fields the SDK doesn't surface as a typed property. This is the supported way to read additional fields the SDK doesn't surface as typed properties:

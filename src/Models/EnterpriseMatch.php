@@ -8,6 +8,8 @@ use AudD\StreamingProvider;
 
 /**
  * One match from the enterprise endpoint. Carries score + offset bounds.
+ * Public-DB matches expose artist/title/etc.; custom-DB matches (your own
+ * fingerprint catalog) expose audio_id instead.
  *
  * Streaming URLs are lis.tn-only: enterprise responses don't carry per-provider
  * metadata blocks, so there's no direct-URL fallback.
@@ -15,7 +17,7 @@ use AudD\StreamingProvider;
 final class EnterpriseMatch extends ForwardCompatModel
 {
     private const KNOWN = [
-        'score', 'timecode', 'artist', 'title', 'album', 'release_date',
+        'score', 'timecode', 'audio_id', 'artist', 'title', 'album', 'release_date',
         'label', 'isrc', 'upc', 'song_link', 'start_offset', 'end_offset',
         'start_seconds', 'end_seconds',
     ];
@@ -27,6 +29,8 @@ final class EnterpriseMatch extends ForwardCompatModel
      */
     public readonly ?int $score;
     public readonly string $timecode;
+    /** Custom-catalog match identifier (the audio_id you uploaded the track under). */
+    public readonly ?int $audio_id;
     public readonly ?string $artist;
     public readonly ?string $title;
     public readonly ?string $album;
@@ -55,6 +59,7 @@ final class EnterpriseMatch extends ForwardCompatModel
     {
         $this->score = self::asInt($payload['score'] ?? null);
         $this->timecode = self::asString($payload['timecode'] ?? null) ?? '';
+        $this->audio_id = self::asInt($payload['audio_id'] ?? null);
         $this->artist = self::asString($payload['artist'] ?? null);
         $this->title = self::asString($payload['title'] ?? null);
         $this->album = self::asString($payload['album'] ?? null);
@@ -68,6 +73,22 @@ final class EnterpriseMatch extends ForwardCompatModel
         $this->start_seconds = self::asFloat($payload['start_seconds'] ?? null);
         $this->end_seconds = self::asFloat($payload['end_seconds'] ?? null);
         parent::__construct(self::extractExtras($payload, self::KNOWN), $payload);
+    }
+
+    /**
+     * True for custom-catalog matches (audio_id is set).
+     */
+    public function isCustomMatch(): bool
+    {
+        return $this->audio_id !== null;
+    }
+
+    /**
+     * True for AudD public-catalog matches (artist or title set, no audio_id).
+     */
+    public function isPublicMatch(): bool
+    {
+        return $this->audio_id === null && ($this->artist !== null || $this->title !== null);
     }
 
     public function thumbnailUrl(): ?string

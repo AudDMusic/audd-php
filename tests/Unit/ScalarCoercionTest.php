@@ -28,6 +28,7 @@ final class ScalarCoercionTest extends TestCase
             'timecode' => 123,        // int → string (timecode is string-typed)
             'start_seconds' => ' 3.5 ', // numeric string (trimmed) → float
             'end_seconds' => 7,       // int → float
+            'audio_id' => '146',      // numeric string → int
         ]);
 
         self::assertSame(85, $match->score);
@@ -38,6 +39,8 @@ final class ScalarCoercionTest extends TestCase
         self::assertSame('123', $match->timecode);
         self::assertSame(3.5, $match->start_seconds);
         self::assertSame(7.0, $match->end_seconds);
+        self::assertSame(146, $match->audio_id);
+        self::assertTrue($match->isCustomMatch());
     }
 
     public function testBoolSourcesCoerce(): void
@@ -63,6 +66,7 @@ final class ScalarCoercionTest extends TestCase
             'end_seconds' => 'Infinity',
             'artist' => ['unexpected'],  // array where string belongs
             'label' => ['k' => 'v'],     // object where string belongs
+            'audio_id' => 'not-a-number',
         ]);
 
         self::assertNull($match->score);
@@ -72,6 +76,8 @@ final class ScalarCoercionTest extends TestCase
         self::assertNull($match->end_seconds);
         self::assertNull($match->artist);
         self::assertNull($match->label);
+        self::assertNull($match->audio_id);
+        self::assertFalse($match->isCustomMatch());
     }
 
     public function testBoolStringWhitelistTrue(): void
