@@ -182,7 +182,8 @@ final class OnEventHookTest extends TestCase
 
         self::assertCount(2, $events);
         self::assertSame('https://enterprise.audd.io/', $events[0]->url);
-        self::assertSame('recognize', $events[0]->method);
+        self::assertSame('recognizeEnterprise', $events[0]->method);
+        self::assertSame('recognizeEnterprise', $events[1]->method);
     }
 
     public function testNoEventsEmittedWhenHookIsNull(): void

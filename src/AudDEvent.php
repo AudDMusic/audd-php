@@ -20,7 +20,7 @@ final class AudDEvent
      */
     public function __construct(
         public readonly AudDEventKind $kind,
-        /** AudD method name, e.g. "recognize", "addStream". */
+        /** The call the event belongs to: "recognize" or "recognizeEnterprise". */
         public readonly string $method,
         public readonly string $url,
         public readonly ?string $requestId = null,

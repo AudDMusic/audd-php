@@ -381,7 +381,7 @@ final class AudD
 
         $this->safeEmit(new AudDEvent(
             kind: AudDEventKind::Request,
-            method: 'recognize',
+            method: 'recognizeEnterprise',
             url: $url,
         ));
         $started = hrtime(true);
@@ -391,7 +391,7 @@ final class AudD
         } catch (TransferException | AudDConnectionException $exc) {
             $this->safeEmit(new AudDEvent(
                 kind: AudDEventKind::Exception,
-                method: 'recognize',
+                method: 'recognizeEnterprise',
                 url: $url,
                 elapsedMs: self::elapsedMs($started),
                 extras: ['error_type' => $exc::class],
@@ -403,7 +403,7 @@ final class AudD
 
         $this->safeEmit(new AudDEvent(
             kind: AudDEventKind::Response,
-            method: 'recognize',
+            method: 'recognizeEnterprise',
             url: $url,
             requestId: $resp->requestId,
             httpStatus: $resp->httpStatus,
