@@ -13,9 +13,9 @@ use GuzzleHttp\Psr7\Request;
 use PHPUnit\Framework\TestCase;
 
 /**
- * customCatalog.add is metered — auto-retry on transport failure could
- * double-charge for the same fingerprinting work. The SDK must therefore
- * make exactly one upload attempt, regardless of maxRetries.
+ * customCatalog.add is never retried automatically: the caller checks the
+ * error before sending it again. The SDK must therefore make exactly one
+ * upload attempt, regardless of maxRetries.
  */
 final class CustomCatalogRetryTest extends TestCase
 {

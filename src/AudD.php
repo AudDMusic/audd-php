@@ -72,6 +72,11 @@ final class AudD
      * an `AudDConfigurationException` is thrown — pointing the user to
      * https://dashboard.audd.io for a token.
      *
+     * @param int $maxRetries Attempts per call, including the first: `3` sends
+     *  a request at most three times, and `0` or `1` sends it once. Which
+     *  failures are retried depends on the call (see the README).
+     * @param float $backoffFactor Initial backoff in seconds before a retry,
+     *  doubled per attempt and jittered.
      * @param \Closure(AudDEvent): void|null $onEvent Optional inspection hook
      *  invoked with `Request`/`Response`/`Exception` events around every
      *  recognize / recognizeEnterprise call. Hook exceptions are swallowed and
@@ -209,8 +214,8 @@ final class AudD
 
     public function customCatalog(): CustomCatalog
     {
-        // custom_catalog.add is metered — never auto-retry; a transport
-        // failure could double-charge for the same fingerprinting work.
+        // custom_catalog.add is sent once and never retried automatically;
+        // the caller decides whether to send it again.
         return $this->customCatalogNamespace ??= new CustomCatalog(
             $this->http,
             $this->noRetryPolicy(),
@@ -239,7 +244,7 @@ final class AudD
      * @phpstan-param string|StreamInterface|SourceBytes|resource $source
      *
      * @param string|list<string>|null $return_metadata  Comma-string or list of metadata keys:
-     *                                           apple_music, spotify, deezer, napster, musicbrainz.
+     *                                           apple_music, spotify, deezer, musicbrainz.
      * @param array<string, string>    $extra_parameters Additional form fields
      *                                                   the typed params don't cover. Typed params win on collision.
      */
@@ -281,7 +286,7 @@ final class AudD
 
         try {
             $resp = $this->recognitionPolicy()->run($do);
-        } catch (TransferException $exc) {
+        } catch (TransferException | AudDConnectionException $exc) {
             $this->safeEmit(new AudDEvent(
                 kind: AudDEventKind::Exception,
                 method: 'recognize',
@@ -289,7 +294,9 @@ final class AudD
                 elapsedMs: self::elapsedMs($started),
                 extras: ['error_type' => $exc::class],
             ));
-            throw new AudDConnectionException($exc->getMessage(), $exc);
+            throw $exc instanceof AudDConnectionException
+                ? $exc
+                : new AudDConnectionException($exc->getMessage(), $exc);
         }
 
         $this->safeEmit(new AudDEvent(
@@ -381,7 +388,7 @@ final class AudD
 
         try {
             $resp = $this->recognitionPolicy()->run($do);
-        } catch (TransferException $exc) {
+        } catch (TransferException | AudDConnectionException $exc) {
             $this->safeEmit(new AudDEvent(
                 kind: AudDEventKind::Exception,
                 method: 'recognize',
@@ -389,7 +396,9 @@ final class AudD
                 elapsedMs: self::elapsedMs($started),
                 extras: ['error_type' => $exc::class],
             ));
-            throw new AudDConnectionException($exc->getMessage(), $exc);
+            throw $exc instanceof AudDConnectionException
+                ? $exc
+                : new AudDConnectionException($exc->getMessage(), $exc);
         }
 
         $this->safeEmit(new AudDEvent(
@@ -493,8 +502,9 @@ final class AudD
 
     private function noRetryPolicy(): Retry
     {
-        // maxAttempts=1 → exactly one attempt, no retries. Used for metered
-        // mutations where re-running silently could double-charge the user.
+        // maxAttempts=1 → exactly one attempt, no retries. Used for
+        // custom_catalog.add, which the caller re-sends only after checking
+        // the error.
         return new Retry(RetryClass::NONE, maxAttempts: 1, backoffFactor: $this->backoffFactor);
     }
 

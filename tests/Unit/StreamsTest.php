@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace AudD\Tests\Unit;
 
 use AudD\AudD;
+use AudD\Errors\AudDBlockedException;
 use AudD\Errors\AudDInvalidRequestException;
 use AudD\Errors\AudDSerializationException;
 use AudD\Helpers;
@@ -40,6 +41,28 @@ final class StreamsTest extends TestCase
         ]));
         $audd = new AudD(apiToken: 'test', httpClient: $mock->buildClient());
         self::assertSame('https://my.app/cb', $audd->streams()->getCallbackUrl());
+    }
+
+    public function testGetCallbackUrlWithNoneConfiguredSaysSo(): void
+    {
+        $mock = new MockHttp();
+        $mock->handler->append(MockHttp::jsonResponse(200, [
+            'status' => 'error',
+            'error' => ['error_code' => 19, 'error_message' => 'Getting the URL for callbacks failed: Internal error.'],
+            'request_api_method' => 'getCallbackUrl',
+        ]));
+        $audd = new AudD(apiToken: 'test', httpClient: $mock->buildClient());
+
+        try {
+            $audd->streams()->getCallbackUrl();
+            self::fail('expected AudDBlockedException');
+        } catch (AudDBlockedException $e) {
+            self::assertSame(19, $e->errorCode);
+            self::assertStringContainsString('No callback URL is configured for this account', $e->getMessage());
+            self::assertStringContainsString('setCallbackUrl', $e->getMessage());
+            self::assertStringContainsString('Getting the URL for callbacks failed', $e->getMessage());
+            self::assertSame('getCallbackUrl', $e->requestMethod);
+        }
     }
 
     public function testSetCallbackUrlMergesReturnMetadata(): void
@@ -229,13 +252,13 @@ final class StreamsTest extends TestCase
     {
         $mock = new MockHttp();
         // A body with neither `result` nor `notification` and no `timeout` key
-        // is still a benign keepalive — the loop must continue polling, not
-        // terminate with a serialization error.
+        // still carries a timestamp, so the loop keeps polling. An empty
+        // object is a failed poll: the loop waits and polls again rather than
+        // ending the subscription.
         $mock->handler->append(MockHttp::jsonResponse(200, [
             'something' => 'else',
             'timestamp' => 1234567,
         ]));
-        // An empty object is likewise a keepalive.
         $mock->handler->append(MockHttp::jsonResponse(200, []));
         // Then a real match arrives.
         $mock->handler->append(MockHttp::jsonResponse(200, [
@@ -246,7 +269,7 @@ final class StreamsTest extends TestCase
                 'results' => [['artist' => 'A', 'title' => 'B', 'score' => 100]],
             ],
         ]));
-        $audd = new AudD(apiToken: 'test', httpClient: $mock->buildClient());
+        $audd = new AudD(apiToken: 'test', backoffFactor: 0.001, httpClient: $mock->buildClient());
 
         $poll = $audd->streams()->longpoll('cat', skipCallbackCheck: true);
         $matches = [];

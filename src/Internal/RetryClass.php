@@ -17,10 +17,10 @@ namespace AudD\Internal;
  *               retry only on pre-upload connection failures. DO NOT retry 5xx
  *               (server-side side-effect may have happened). Server-idempotent
  *               on radio_id, so a connect-stage retry is safe.
- * NONE        — custom_catalog.add: never retry. The upload is metered and
- *               a transport-level retry could double-charge for the same
- *               fingerprinting work. The first transient failure surfaces as
- *               a clean exception for the caller to decide on.
+ * NONE        — custom_catalog.add: never retried automatically. The first
+ *               failure surfaces as a clean exception; the caller checks it
+ *               before sending again (an upload to an audio_id that already
+ *               holds a song replaces it).
  *
  * @internal
  */

@@ -83,6 +83,35 @@ final class OnEventHookTest extends TestCase
         self::assertArrayHasKey('error_type', $last->extras);
     }
 
+    public function testEmitsExceptionEventWhenAPsr18ClientFails(): void
+    {
+        $client = new class () implements \Psr\Http\Client\ClientInterface {
+            public function sendRequest(\Psr\Http\Message\RequestInterface $request): \Psr\Http\Message\ResponseInterface
+            {
+                throw new \RuntimeException('network down');
+            }
+        };
+        /** @var list<AudDEvent> $events */
+        $events = [];
+        $audd = new AudD(
+            apiToken: 'test',
+            httpClient: $client,
+            maxRetries: 1,
+            onEvent: function (AudDEvent $e) use (&$events): void {
+                $events[] = $e;
+            },
+        );
+        try {
+            $audd->recognize('https://x.mp3');
+            self::fail('Expected AudDConnectionException');
+        } catch (AudDConnectionException $e) {
+            self::assertSame('network down', $e->getMessage());
+        }
+
+        self::assertCount(2, $events);
+        self::assertSame(AudDEventKind::Exception, $events[1]->kind);
+    }
+
     public function testHookExceptionsAreSwallowed(): void
     {
         $mock = new MockHttp();

@@ -105,7 +105,7 @@ function preflightCallback(AudD $audd, string $mode): bool
         if ($noneSet) {
             fwrite(
                 STDERR,
-                "stream slot exists but no callback URL is configured for this account; "
+                'stream slot exists but no callback URL is configured for this account; '
                 . "longpoll won't deliver. Set one first via "
                 . '$audd->streams()->setCallbackUrl(...).' . "\n",
             );
@@ -225,11 +225,11 @@ try {
         $poll->close();
     });
 
-    // Signal handling — clean teardown on SIGINT/SIGTERM. The longpoll loop
-    // can't be interrupted mid-request, so we ask it to close at the next
-    // safe point. SIGINT/TERM closes both onError-driven and signal-driven.
+    // Signal handling — clean teardown on SIGINT/SIGTERM. close() abandons
+    // the poll that is waiting on the server, so run() returns within about
+    // a second and the finally block below runs.
     $signalHandler = function (int $signo) use ($poll): void {
-        fwrite(STDERR, "\nsignal $signo received; stopping after current poll cycle\n");
+        fwrite(STDERR, "\nsignal $signo received; stopping\n");
         $poll->close();
     };
     pcntl_signal(SIGINT, $signalHandler);
@@ -254,7 +254,7 @@ try {
         if (isset($weSetPlaceholder) && $weSetPlaceholder) {
             fwrite(
                 STDERR,
-                "left audd.tech/empty/ as your account callback — change it via "
+                'left audd.tech/empty/ as your account callback — change it via '
                 . '$audd->streams()->setCallbackUrl(...) if needed.' . "\n",
             );
         }

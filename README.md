@@ -13,7 +13,7 @@ The API itself is so simple that it can easily be used even without an SDK: [doc
 ## Quickstart
 
 ```bash
-composer require audd/audd:^1.5.17
+composer require audd/audd:^1.5.18
 ```
 
 Get your API token at [dashboard.audd.io](https://dashboard.audd.io).
@@ -42,7 +42,7 @@ if ($result !== null) {
 }
 ```
 
-`recognize()` accepts a URL, a filesystem path, a PSR-7 `StreamInterface`, a `resource` handle, or raw bytes wrapped via `AudD::bytes($buf)` — auto-detected. It returns a `RecognitionResult` on a match, or `null` when the clip isn't recognized.
+`recognize()` accepts a URL, a filesystem path, a PSR-7 `StreamInterface`, a `resource` handle (left open for you to close), or raw bytes wrapped via `AudD::bytes($buf)` — auto-detected. It returns a `RecognitionResult` on a match, or `null` when the clip isn't recognized.
 
 For longer audio files (full-length songs, short-form videos, podcasts, broadcasts, DJ sets), use `recognizeEnterprise($source, limit: ...)` — it returns `list<EnterpriseMatch>`, one per song detected across the file.
 
@@ -212,7 +212,7 @@ $logger->pushHandler(new StreamHandler('php://stderr', Logger::DEBUG));
 $audd = new AudD(apiToken: 'your-token', logger: $logger);
 ```
 
-Records emitted today: `debug` for `onEvent` hook failures (with the exception in context), `warning` for server-side deprecated-parameter notices (server code 51).
+Records emitted: `debug` for `onEvent` hook failures (with the exception in context), and `warning` for warnings the server attaches to a response, such as a deprecated or unknown parameter like a misspelled `return_metadata` value (server code 51, which also raises an `E_USER_DEPRECATED` notice).
 
 ## Configuration
 
@@ -222,7 +222,7 @@ use GuzzleHttp\Client;
 
 $audd = new AudD(
     apiToken: 'your-token',
-    maxRetries: 3,                                        // per-call retry budget
+    maxRetries: 3,                                        // attempts per call, including the first
     backoffFactor: 0.5,                                   // initial backoff seconds (jittered)
     httpClient: new Client(['proxy' => 'http://corp:8080']),
     onEvent: fn ($e) => error_log((string) $e->method),
@@ -241,7 +241,7 @@ If the client you inject is a Guzzle client, the SDK passes its timeouts as per-
 | `RECOGNITION` | `recognize`, `recognizeEnterprise`, `advanced->*`            | failures to establish the connection, and 5xx responses                                 |
 | `READ`        | `streams->list`, `streams->getCallbackUrl`, longpoll         | any network error, plus 408, 429, and 5xx                                               |
 | `MUTATING`    | `streams->setCallbackUrl`, `streams->add`, `streams->delete` | failures to establish the connection — never 5xx (the change may already have been applied) |
-| `NONE`        | `customCatalog->add`                                         | never retried — the upload is metered, and re-sending it could double-bill              |
+| `NONE`        | `customCatalog->add`                                         | never retried automatically: check the error before sending it again (an upload to an `audio_id` that already holds a song replaces it) |
 
 `RECOGNITION` will not double-bill your account: any failure after the connection is up and the upload is in flight is surfaced rather than retried, because the server may already be processing the audio.
 
@@ -261,7 +261,7 @@ $audd = new AudD(
 );
 ```
 
-**Timeouts.** Defaults are 30s connect / 60s read for standard endpoints, and 30s connect / 1 hour read for the enterprise endpoint (which can legitimately process multi-hour files). Override per call with `timeout:` (seconds).
+**Timeouts.** Defaults are 30s connect / 60s read for standard endpoints, and 30s connect / 1 hour read for the enterprise endpoint (which can legitimately process multi-hour files). The read timeout is how long a request may go without receiving data. Override it per call with `timeout:` (seconds).
 
 ## Streams
 
@@ -319,14 +319,21 @@ $poll->onMatch(function (StreamCallbackMatch $m): void {
 $poll->onNotification(function (StreamCallbackNotification $n): void {
     echo 'notification: ', $n->notification_message, "\n";
 });
-$poll->onError(function (\Throwable $e) use ($poll): void {
+$poll->onError(function (\Throwable $e): void {
     fwrite(STDERR, $e->getMessage() . "\n");
-    $poll->close();
 });
-$poll->run();  // blocks until close() or a terminal error
+$poll->run();  // blocks until close() or an error ends the subscription
 ```
 
-Keepalive responses (`{"timeout":"no events before timeout"}`) are silently absorbed — your `onMatch`/`onNotification` only fire on real events.
+`run()` delivers events in the order they happened and keeps polling until you call `close()`. Polls that end with no events are absorbed, so `onMatch` and `onNotification` only fire on real events. Network errors and 408, 429 and 5xx responses don't end the subscription: the loop waits about a second, doubling up to 30 seconds, and polls again. `onError` fires once, when the subscription ends: after 8 failed polls in a row, on any other 4xx, or when the server rejects the request — for example a `timeout` outside 1–120 seconds, reported as `AudDInvalidRequestException` with the server's message.
+
+To stop a long-running worker cleanly, call `close()` from a signal handler. With the SDK's built-in HTTP client, a poll that is waiting on the server is abandoned within about a second; with an injected `httpClient`, `run()` returns when the current poll ends.
+
+```php
+pcntl_async_signals(true);
+pcntl_signal(SIGTERM, fn () => $poll->close());
+$poll->run();
+```
 
 `deriveLongpollCategory` is a local computation: `MD5(MD5(api_token) + radio_id)` truncated to 9 hex chars. The category alone is sufficient to subscribe — the api_token is never sent over the wire for longpolls.
 

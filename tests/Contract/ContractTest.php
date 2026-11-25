@@ -10,9 +10,12 @@ use AudD\Errors\AudDInvalidRequestException;
 use AudD\Errors\AudDQuotaException;
 use AudD\Errors\AudDSubscriptionException;
 use AudD\Errors\ErrorMapping;
+use AudD\LongpollConsumer;
 use AudD\Models\EnterpriseMatch;
 use AudD\Models\RecognitionResult;
+use AudD\Models\StreamCallbackMatch;
 use AudD\Streams;
+use AudD\Tests\Unit\MockHttp;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -124,6 +127,46 @@ final class ContractTest extends TestCase
         self::assertArrayHasKey('timeout', $body);
         self::assertSame('no events before timeout', $body['timeout']);
         self::assertIsInt($body['timestamp']);
+    }
+
+    public function testLongpollEventsDeliverEachCallbackPayload(): void
+    {
+        $raw = (string) json_encode(FixtureLoader::load('longpoll_events.json'), JSON_THROW_ON_ERROR);
+        $mock = new MockHttp();
+        $mock->handler->append(MockHttp::rawResponse(200, $raw));
+        $poll = (new LongpollConsumer(category: 'abc123def', httpClient: $mock->buildClient()))->iterate();
+
+        $matches = [];
+        $poll->onMatch(function (StreamCallbackMatch $m) use (&$matches, $poll): void {
+            $matches[] = $m;
+            if (count($matches) === 2) {
+                $poll->close();
+            }
+        });
+        $poll->run();
+
+        self::assertCount(2, $matches);
+        self::assertSame('Alan Walker, A$AP Rocky', $matches[0]->song->artist);
+        self::assertSame('Tears For Fears', $matches[1]->song->artist);
+        self::assertSame(7, $matches[1]->radio_id);
+    }
+
+    public function testLongpollErrorReachesOnErrorAsInvalidRequest(): void
+    {
+        $raw = (string) json_encode(FixtureLoader::load('longpoll_error.json'), JSON_THROW_ON_ERROR);
+        $mock = new MockHttp();
+        $mock->handler->append(MockHttp::rawResponse(200, $raw));
+        $poll = (new LongpollConsumer(category: 'abc123def', httpClient: $mock->buildClient()))->iterate();
+
+        $errors = [];
+        $poll->onError(function (\Throwable $e) use (&$errors): void {
+            $errors[] = $e;
+        });
+        $poll->run();
+
+        self::assertCount(1, $errors);
+        self::assertInstanceOf(AudDInvalidRequestException::class, $errors[0]);
+        self::assertCount(1, $mock->history);
     }
 
     public function testError900MapsToAuthenticationException(): void

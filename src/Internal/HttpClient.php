@@ -8,6 +8,9 @@ use AudD\Errors\AudDConnectionException;
 use AudD\Version;
 use GuzzleHttp\Client as GuzzleClient;
 use GuzzleHttp\Exception\TransferException;
+use GuzzleHttp\Handler\CurlMultiHandler;
+use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Promise\PromiseInterface;
 use GuzzleHttp\RequestOptions;
 use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\ResponseInterface;
@@ -26,6 +29,14 @@ use Psr\Http\Message\StreamInterface;
  * NOT close it on `close()`. When it manufactures a Guzzle client itself, it
  * does — preventing connection-pool leaks via __destruct.
  *
+ * Timeouts: every request carries `connect_timeout` and `read_timeout`. The
+ * read timeout is how long the transfer may go without receiving data. Guzzle's
+ * cURL handler ignores `read_timeout`, so the same limit is also sent as cURL's
+ * low-speed limit (abort when under 1 byte/s for that many seconds). Both reach
+ * an injected Guzzle client as per-request options; `curl` options configured on
+ * that client are kept and win on collision. A non-Guzzle PSR-18 client has no
+ * per-request timeout channel and uses its own settings.
+ *
  * @internal
  */
 final class HttpClient
@@ -36,6 +47,10 @@ final class HttpClient
     private readonly bool $owned;
 
     private bool $closed = false;
+
+    /** Owned clients only: event loop and client for cancellable GETs. */
+    private ?CurlMultiHandler $multi = null;
+    private ?GuzzleClient $cancellableClient = null;
 
     /** Mutable: rotated by AudD::setApiToken() at runtime. */
     private string $apiToken;
@@ -51,7 +66,7 @@ final class HttpClient
             $this->client = new GuzzleClient([
                 RequestOptions::CONNECT_TIMEOUT => $connectTimeout,
                 RequestOptions::READ_TIMEOUT => $readTimeout,
-                RequestOptions::TIMEOUT => 0, // we honor read+connect explicitly
+                RequestOptions::TIMEOUT => 0, // no total limit; connect + read timeouts are set per request
                 RequestOptions::HTTP_ERRORS => false, // we surface non-2xx ourselves
                 'headers' => ['User-Agent' => Version::userAgent()],
             ]);
@@ -112,13 +127,20 @@ final class HttpClient
      * token in the query string (e.g. the longpoll endpoint, which authorizes
      * via the derived category alone and rejects a token parameter).
      *
-     * @param array<string, scalar> $params
+     * `$cancel` is polled about once a second while the request waits; when it
+     * returns true the request is abandoned and an AudDConnectionException is
+     * thrown. This needs the SDK's own Guzzle client and ext-curl; with an
+     * injected client the request runs to completion and `$cancel` is ignored.
+     *
+     * @param array<string, scalar>  $params
+     * @param (\Closure(): bool)|null $cancel
      */
     public function get(
         string $url,
         array $params,
         ?float $perCallTimeout = null,
         bool $sendToken = true,
+        ?\Closure $cancel = null,
     ): HttpResponse {
         $full = $params;
         if ($sendToken && !isset($full['api_token']) && $this->apiToken !== '') {
@@ -126,6 +148,13 @@ final class HttpClient
         }
         $options = $this->baseOptions($perCallTimeout);
         $options[RequestOptions::QUERY] = $full;
+
+        if ($cancel !== null) {
+            $client = $this->cancellableClient();
+            if ($client !== null && $this->multi !== null) {
+                return $this->executeCancellable($client, $this->multi, $url, $options, $cancel);
+            }
+        }
 
         return $this->execute('GET', $url, $options);
     }
@@ -163,22 +192,108 @@ final class HttpClient
      */
     private function baseOptions(?float $perCallTimeout): array
     {
+        $readTimeout = $perCallTimeout ?? $this->readTimeout;
         $options = [
             RequestOptions::HTTP_ERRORS => false,
             RequestOptions::CONNECT_TIMEOUT => $this->connectTimeout,
-            RequestOptions::READ_TIMEOUT => $perCallTimeout ?? $this->readTimeout,
+            RequestOptions::READ_TIMEOUT => $readTimeout,
             'headers' => ['User-Agent' => Version::userAgent()],
         ];
-        // TCP keepalive defense for long-running enterprise uploads. Guzzle
-        // doesn't expose a knob for this directly, so we set the cURL option.
-        if ($this->readTimeout > 120) {
-            $options['curl'] = [
-                CURLOPT_TCP_KEEPALIVE => 1,
-                CURLOPT_TCP_KEEPIDLE => 30,
-                CURLOPT_TCP_KEEPINTVL => 30,
-            ];
+        $curl = $this->curlOptions($readTimeout);
+        if ($curl !== []) {
+            $options['curl'] = $curl;
         }
         return $options;
+    }
+
+    /**
+     * cURL-level options: the read timeout as a low-speed limit, TCP keepalive
+     * for long enterprise uploads, then whatever `curl` options an injected
+     * Guzzle client was configured with (a per-request `curl` array replaces
+     * the client's, so they are merged back in here).
+     *
+     * @return array<int, mixed>
+     */
+    private function curlOptions(float $readTimeout): array
+    {
+        if (!\extension_loaded('curl')) {
+            return [];
+        }
+        $curl = [];
+        if ($readTimeout > 0) {
+            $curl[CURLOPT_LOW_SPEED_LIMIT] = 1;
+            $curl[CURLOPT_LOW_SPEED_TIME] = max(1, (int) ceil($readTimeout));
+        }
+        // TCP keepalive defense for long-running enterprise uploads.
+        if ($this->readTimeout > 120) {
+            $curl[CURLOPT_TCP_KEEPALIVE] = 1;
+            $curl[CURLOPT_TCP_KEEPIDLE] = 30;
+            $curl[CURLOPT_TCP_KEEPINTVL] = 30;
+        }
+        if ($this->client instanceof GuzzleClient) {
+            $configured = $this->client->getConfig('curl');
+            if (is_array($configured)) {
+                $curl = array_replace($curl, $configured);
+            }
+        }
+        return $curl;
+    }
+
+    /**
+     * Lazily build the Guzzle client used for cancellable GETs. Only for
+     * clients this wrapper owns, and only when ext-curl is available.
+     */
+    private function cancellableClient(): ?GuzzleClient
+    {
+        if (!$this->owned || !\function_exists('curl_multi_init')) {
+            return null;
+        }
+        if ($this->cancellableClient === null) {
+            $this->multi = new CurlMultiHandler();
+            $this->cancellableClient = new GuzzleClient([
+                'handler' => HandlerStack::create($this->multi),
+                RequestOptions::HTTP_ERRORS => false,
+                'headers' => ['User-Agent' => Version::userAgent()],
+            ]);
+        }
+        return $this->cancellableClient;
+    }
+
+    /**
+     * Drive one request on the multi handler, checking `$cancel` between
+     * event-loop ticks (each tick waits at most about a second). Runs PHP code
+     * between ticks, so `pcntl` signal handlers get to run too.
+     *
+     * @param array<string, mixed> $options
+     * @param \Closure(): bool     $cancel
+     */
+    private function executeCancellable(
+        GuzzleClient $client,
+        CurlMultiHandler $multi,
+        string $url,
+        array $options,
+        \Closure $cancel,
+    ): HttpResponse {
+        $promise = $client->requestAsync('GET', $url, $options);
+        while ($promise->getState() === PromiseInterface::PENDING) {
+            if ($cancel()) {
+                $promise->cancel();
+                throw new AudDConnectionException('Request cancelled');
+            }
+            $multi->tick();
+        }
+        try {
+            $resp = $promise->wait();
+        } catch (\Throwable $exc) {
+            if ($exc instanceof TransferException) {
+                throw $exc;
+            }
+            throw new AudDConnectionException($exc->getMessage(), $exc);
+        }
+        if (!$resp instanceof ResponseInterface) {
+            throw new AudDConnectionException('HTTP client returned no response');
+        }
+        return self::wrap($resp);
     }
 
     /**

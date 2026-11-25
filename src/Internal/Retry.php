@@ -19,17 +19,24 @@ final class Retry
     private const HTTP_TOO_MANY_REQUESTS = 429;
     private const HTTP_SERVER_ERROR_FLOOR = 500;
     private const BACKOFF_MAX_SECONDS = 30.0;
+    private const CURL_OPERATION_TIMED_OUT = 28;
+
+    /** Total attempts per call, including the first. Always at least 1. */
+    public readonly int $maxAttempts;
 
     public function __construct(
         public readonly RetryClass $retryClass,
-        public readonly int $maxAttempts = 3,
+        int $maxAttempts = 3,
         public readonly float $backoffFactor = 0.5,
     ) {
+        $this->maxAttempts = max(1, $maxAttempts);
     }
 
     /**
      * Run `$fn` with retry. Returns the final HttpResponse, or rethrows the
      * last exception when retries are exhausted on a connection-side failure.
+     * When the audio source can't be sent a second time, the previous
+     * attempt's response or exception is the result.
      *
      * @param \Closure(): HttpResponse $fn
      *
@@ -42,6 +49,11 @@ final class Retry
         for ($attempt = 0; $attempt < $this->maxAttempts; $attempt++) {
             try {
                 $resp = $fn();
+            } catch (SourceNotReplayableException $exc) {
+                if ($lastResp !== null) {
+                    return $lastResp;
+                }
+                throw $lastExc ?? $exc;
             } catch (\Throwable $exc) {
                 $lastExc = $exc;
                 $lastResp = null;
@@ -69,12 +81,8 @@ final class Retry
         if ($lastResp !== null) {
             return $lastResp;
         }
-        // Exhausted on exceptions — the inner throw already covered this; this
-        // branch is unreachable in normal flow but keeps the type checker happy.
-        if ($lastExc !== null) {
-            throw $lastExc;
-        }
-        throw new \LogicException('Retry loop exited without a result or exception');
+        // Unreachable: maxAttempts >= 1 and every path above returns or throws.
+        throw $lastExc ?? new \LogicException('Retry loop exited without a result or exception');
     }
 
     private function shouldRetryResponse(HttpResponse $resp): bool
@@ -92,9 +100,24 @@ final class Retry
     {
         return match ($this->retryClass) {
             RetryClass::READ => $exc instanceof TransferException,
-            RetryClass::RECOGNITION, RetryClass::MUTATING => $exc instanceof ConnectException,
+            RetryClass::RECOGNITION, RetryClass::MUTATING => $exc instanceof ConnectException
+                && !self::timedOutAfterConnecting($exc),
             RetryClass::NONE => false,
         };
+    }
+
+    /**
+     * A cURL timeout on a connection that was already established: the
+     * request may have reached the server, so it is not a pre-upload failure.
+     */
+    private static function timedOutAfterConnecting(ConnectException $exc): bool
+    {
+        $context = $exc->getHandlerContext();
+        $connectTime = $context['connect_time'] ?? 0;
+
+        return ($context['errno'] ?? null) === self::CURL_OPERATION_TIMED_OUT
+            && is_numeric($connectTime)
+            && (float) $connectTime > 0.0;
     }
 
     private function backoffDelay(int $attempt): float

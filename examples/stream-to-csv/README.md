@@ -60,7 +60,8 @@ result envelopes are what get written to CSV.
 
 ## Signal handling
 
-`pcntl_signal(SIGINT|SIGTERM, ...)` flips a stop flag; the longpoll loop
-checks it via `pcntl_signal_dispatch()` after each event. Mode 1 deletes the
+`pcntl_signal(SIGINT|SIGTERM, ...)` calls `$poll->close()`. With
+`pcntl_async_signals(true)` the poll that is waiting on the server is
+abandoned and `run()` returns within about a second. Mode 1 deletes the
 stream slot in the `finally` block before exit. Requires the `pcntl`
 extension (built into the standard PHP CLI on Linux/macOS).

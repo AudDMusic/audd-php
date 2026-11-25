@@ -21,11 +21,13 @@ use Psr\Http\Message\StreamInterface;
  *   - URL string ("http(s)://..."):    routed via `data['url']` field
  *   - file path string (existing file): routed via `multipart` 'file' part
  *   - StreamInterface (PSR-7 stream):  routed via `multipart` 'file' part
- *   - resource (PHP stream):           routed via `multipart` 'file' part
+ *   - resource (PHP stream):           routed via `multipart` 'file' part;
+ *                                      the handle is left open for the caller
  *   - raw bytes wrapped via AudD::bytes($bytes) for unambiguous raw-bytes intent
  *
- * Unseekable streams: a retry will fail loudly rather than silently sending an
- * empty body.
+ * Unseekable streams can't be sent twice: the re-opener throws
+ * SourceNotReplayableException and the retry loop keeps the previous
+ * attempt's outcome instead of sending an empty body.
  *
  * @internal
  */
@@ -118,7 +120,7 @@ final class Source
             return static function () use ($source, &$firstCall, $seekable, $start): array {
                 if (!$firstCall) {
                     if (!$seekable || $start === null) {
-                        throw new \RuntimeException(
+                        throw new SourceNotReplayableException(
                             'Cannot retry an unseekable PSR-7 stream source. Buffer the content '
                             . 'as raw bytes via AudD\\AudD::bytes(...) instead.',
                         );
@@ -150,8 +152,8 @@ final class Source
             $firstCall = true;
             return static function () use ($fl, &$firstCall, $seekable, $start): array {
                 if (!$firstCall) {
-                    if (!$seekable || $start === null) {
-                        throw new \RuntimeException(
+                    if (!$seekable || $start === null || !is_resource($fl)) {
+                        throw new SourceNotReplayableException(
                             'Cannot retry an unseekable resource source. Buffer the content as '
                             . 'raw bytes via AudD\\AudD::bytes(...) instead.',
                         );
@@ -159,9 +161,11 @@ final class Source
                     fseek($fl, $start);
                 }
                 $firstCall = false;
+                // BorrowedStream: Guzzle closes the bodies it sends, and the
+                // handle belongs to the caller.
                 return [[], [[
                     'name' => 'file',
-                    'contents' => $fl,
+                    'contents' => new BorrowedStream($fl),
                     'filename' => 'upload.bin',
                     'headers' => ['Content-Type' => 'application/octet-stream'],
                 ]]];

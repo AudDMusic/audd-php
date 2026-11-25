@@ -104,13 +104,15 @@ final class RecognitionResult extends ForwardCompatModel
      *
      * Resolution order:
      *  1. Direct URL from the corresponding metadata block (`apple_music.url`,
-     *     `spotify.external_urls.spotify`, `deezer.link`, `napster.href`).
+     *     `spotify.external_urls.spotify`, `deezer.link`).
      *     Direct = no redirect, faster for clients. Available only when the
      *     user requested that provider via `return=`.
-     *  2. lis.tn redirect `"{$songLink}?{$provider->value}"` when `song_link`
-     *     is on `lis.tn`. Works regardless of whether `return=` was set.
+     *  2. lis.tn redirect (`"{$songLink}?spotify"`, `?apple`, `?deezer`,
+     *     `?youtube`) when `song_link` is on `lis.tn`. Works regardless of
+     *     whether `return=` was set.
      *  3. `null` otherwise (e.g., YouTube `song_link` and the user didn't
      *     request the provider's metadata). YouTube has only the lis.tn path.
+     *     Always `null` for Napster.
      */
     public function streamingUrl(StreamingProvider $provider): ?string
     {
@@ -118,15 +120,16 @@ final class RecognitionResult extends ForwardCompatModel
         if ($direct !== null) {
             return $direct;
         }
-        return self::lisTnRedirect($this->song_link, $provider->value);
+        $key = $provider->lisTnKey();
+        return $key === null ? null : self::lisTnRedirect($this->song_link, $key);
     }
 
     /**
      * All providers with a resolvable URL — direct or via lis.tn redirect.
      *
      * Returns an associative array keyed by provider value (`"spotify"`,
-     * `"apple_music"`, `"deezer"`, `"napster"`, `"youtube"`). Empty array
-     * when neither path resolves for any provider.
+     * `"apple_music"`, `"deezer"`, `"youtube"`). Empty array when neither
+     * path resolves for any provider.
      *
      * @return array<string, string>
      */
@@ -217,12 +220,7 @@ final class RecognitionResult extends ForwardCompatModel
                 }
                 break;
             case StreamingProvider::NAPSTER:
-                if ($this->napster !== null) {
-                    $href = $this->napster->extras['href'] ?? null;
-                    if (is_string($href) && $href !== '') {
-                        return $href;
-                    }
-                }
+                // Napster links don't resolve; no URL is offered.
                 break;
             case StreamingProvider::YOUTUBE:
                 // YouTube has no metadata block; only the lis.tn redirect path.

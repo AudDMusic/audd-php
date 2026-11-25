@@ -19,9 +19,9 @@ final class StreamingProviderTest extends TestCase
     {
         $r = self::buildResult(['song_link' => 'https://lis.tn/abc']);
         self::assertSame('https://lis.tn/abc?spotify', $r->streamingUrl(StreamingProvider::SPOTIFY));
-        self::assertSame('https://lis.tn/abc?apple_music', $r->streamingUrl(StreamingProvider::APPLE_MUSIC));
+        self::assertSame('https://lis.tn/abc?apple', $r->streamingUrl(StreamingProvider::APPLE_MUSIC));
         self::assertSame('https://lis.tn/abc?deezer', $r->streamingUrl(StreamingProvider::DEEZER));
-        self::assertSame('https://lis.tn/abc?napster', $r->streamingUrl(StreamingProvider::NAPSTER));
+        self::assertNull($r->streamingUrl(StreamingProvider::NAPSTER));
         self::assertSame('https://lis.tn/abc?youtube', $r->streamingUrl(StreamingProvider::YOUTUBE));
     }
 
@@ -55,7 +55,7 @@ final class StreamingProviderTest extends TestCase
         self::assertSame('https://music.apple.com/album/123', $r->streamingUrl(StreamingProvider::APPLE_MUSIC));
         self::assertSame('https://deezer.com/track/456', $r->streamingUrl(StreamingProvider::DEEZER));
         self::assertSame('https://open.spotify.com/track/789', $r->streamingUrl(StreamingProvider::SPOTIFY));
-        self::assertSame('https://napster.com/track/000', $r->streamingUrl(StreamingProvider::NAPSTER));
+        self::assertNull($r->streamingUrl(StreamingProvider::NAPSTER));
         // YouTube has no direct-URL path, only lis.tn redirect.
         self::assertSame('https://lis.tn/abc?youtube', $r->streamingUrl(StreamingProvider::YOUTUBE));
     }
@@ -64,12 +64,12 @@ final class StreamingProviderTest extends TestCase
     {
         $r = self::buildResult(['song_link' => 'https://lis.tn/x']);
         $urls = $r->streamingUrls();
-        self::assertCount(5, $urls);
-        self::assertSame('https://lis.tn/x?spotify', $urls['spotify']);
-        self::assertSame('https://lis.tn/x?apple_music', $urls['apple_music']);
-        self::assertSame('https://lis.tn/x?deezer', $urls['deezer']);
-        self::assertSame('https://lis.tn/x?napster', $urls['napster']);
-        self::assertSame('https://lis.tn/x?youtube', $urls['youtube']);
+        self::assertSame([
+            'spotify' => 'https://lis.tn/x?spotify',
+            'apple_music' => 'https://lis.tn/x?apple',
+            'deezer' => 'https://lis.tn/x?deezer',
+            'youtube' => 'https://lis.tn/x?youtube',
+        ], $urls);
     }
 
     public function testStreamingUrlsEmptyWithoutSongLinkOrMetadata(): void
@@ -125,7 +125,12 @@ final class StreamingProviderTest extends TestCase
             'song_link' => 'https://lis.tn/X',
         ]);
         self::assertSame('https://lis.tn/X?spotify', $m->streamingUrl(StreamingProvider::SPOTIFY));
-        self::assertCount(5, $m->streamingUrls());
+        self::assertSame('https://lis.tn/X?apple', $m->streamingUrl(StreamingProvider::APPLE_MUSIC));
+        self::assertNull($m->streamingUrl(StreamingProvider::NAPSTER));
+        self::assertSame(
+            ['spotify', 'apple_music', 'deezer', 'youtube'],
+            array_keys($m->streamingUrls()),
+        );
     }
 
     public function testEnterpriseMatchNoMetadataFallback(): void

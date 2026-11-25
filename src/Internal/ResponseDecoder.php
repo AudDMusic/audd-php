@@ -13,6 +13,8 @@ use Psr\Log\LoggerInterface;
  * Shared response decoder. Distinguishes:
  *   - HTTP non-2xx + non-JSON body → AudDServerException (preserves status)
  *   - HTTP 2xx + non-JSON body     → AudDSerializationException
+ *   - top-level `warning` object (e.g. code 51 on a success body) → PSR-3
+ *     warning, plus E_USER_DEPRECATED for code 51; the body is otherwise untouched
  *   - status=error + code 51 + result → emit E_USER_DEPRECATED, strip error, fall through
  *   - status=error otherwise        → typed AudDApiException via ErrorMapping
  *   - status=success                → returns the decoded body dict
@@ -47,6 +49,7 @@ final class ResponseDecoder
             throw new AudDSerializationException('Unparseable response', $resp->rawText);
         }
 
+        self::reportWarning($body, $logger);
         self::maybeWarnAndStripDeprecation($body, $logger);
 
         $status = $body['status'] ?? null;
@@ -68,6 +71,32 @@ final class ResponseDecoder
             requestId: $resp->requestId,
             rawResponse: $body,
         );
+    }
+
+    /**
+     * Surface a top-level `warning` object, which the server attaches to an
+     * otherwise successful response — e.g. code 51 for a deprecated or unknown
+     * parameter such as a misspelled `return` value. Code 51 also raises a
+     * PHP-native E_USER_DEPRECATED notice.
+     *
+     * @param array<string, mixed> $body
+     */
+    private static function reportWarning(array $body, ?LoggerInterface $logger): void
+    {
+        $warning = $body['warning'] ?? null;
+        if (!is_array($warning)) {
+            return;
+        }
+        $code = $warning['error_code'] ?? null;
+        $code = is_int($code) || (is_string($code) && ctype_digit($code)) ? (int) $code : null;
+        $msg = $warning['error_message'] ?? null;
+        $msg = is_string($msg) && $msg !== '' ? $msg : 'Server warning';
+        if ($code === self::DEPRECATED_PARAMS_CODE) {
+            @trigger_error($msg, E_USER_DEPRECATED);
+            $logger?->warning('audd: deprecated parameter', ['message' => $msg, 'error_code' => $code]);
+            return;
+        }
+        $logger?->warning('audd: server warning', ['message' => $msg, 'error_code' => $code]);
     }
 
     /**

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace AudD;
 
 use AudD\Errors\AudDApiException;
+use AudD\Errors\AudDBlockedException;
 use AudD\Errors\AudDConnectionException;
 use AudD\Errors\AudDInvalidRequestException;
 use AudD\Errors\AudDSerializationException;
@@ -33,6 +34,9 @@ final class Streams
 {
     private const API_BASE = 'https://api.audd.io';
     private const NO_CALLBACK_ERROR_CODE = 19;
+    private const NO_CALLBACK_MESSAGE =
+        'No callback URL is configured for this account. '
+        . 'Set one with $audd->streams()->setCallbackUrl(...).';
     private const PREFLIGHT_HINT =
         "Longpoll won't deliver events because no callback URL is configured for this account. "
         . 'Set one first via $audd->streams()->setCallbackUrl(...) — `https://audd.tech/empty/` is fine '
@@ -162,9 +166,32 @@ final class Streams
         $this->postFor('setCallbackUrl', $data, $this->mutatingPolicy);
     }
 
+    /**
+     * The callback URL configured for this account.
+     *
+     * @throws AudDBlockedException With `errorCode` 19 when no callback URL is
+     *                              configured; the message says so and names
+     *                              `setCallbackUrl(...)`.
+     */
     public function getCallbackUrl(): string
     {
-        $result = $this->postFor('getCallbackUrl', [], $this->readPolicy);
+        try {
+            $result = $this->postFor('getCallbackUrl', [], $this->readPolicy);
+        } catch (AudDBlockedException $exc) {
+            if ($exc->errorCode !== self::NO_CALLBACK_ERROR_CODE) {
+                throw $exc;
+            }
+            throw new AudDBlockedException(
+                errorCode: $exc->errorCode,
+                apiMessage: self::NO_CALLBACK_MESSAGE . ' [Server message: ' . $exc->apiMessage . ']',
+                httpStatus: $exc->httpStatus,
+                requestId: $exc->requestId,
+                requestedParams: $exc->requestedParams,
+                requestMethod: $exc->requestMethod,
+                brandedMessage: $exc->brandedMessage,
+                rawResponse: $exc->rawResponse,
+            );
+        }
         return is_string($result) ? $result : (string) $result;
     }
 
@@ -240,14 +267,17 @@ final class Streams
      *
      * Returns a `LongpollPoll` handle: register `onMatch` / `onNotification` /
      * `onError` callbacks, then call `run()` to drive the loop until you call
-     * `close()` or a terminal error fires.
-     *
-     * Keepalive responses (`{"timeout":"no events before timeout"}`) are
-     * silently absorbed by the loop.
+     * `close()` or an error ends the subscription. `LongpollPoll` describes
+     * the responses, retries and stopping.
      *
      * On entry runs a one-time `getCallbackUrl()` preflight unless
      * `$skipCallbackCheck` is true — catches the silent-failure mode where
      * the account has no callback URL set.
+     *
+     * @param int|null $sinceTime Server timestamp (ms) to resume after; only
+     *                            newer events are delivered.
+     * @param int      $timeout   Seconds the server holds each poll open
+     *                            waiting for events, 1 to 120.
      *
      * @throws AudDInvalidRequestException When neither or both of `$category`
      *                                     and `$radioId` are supplied, or when

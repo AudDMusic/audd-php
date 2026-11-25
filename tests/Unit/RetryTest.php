@@ -78,6 +78,42 @@ final class RetryTest extends TestCase
         self::assertCount(2, $mock->history);
     }
 
+    public function testRecognitionPolicyDoesNotResendAfterATimeoutOnAnEstablishedConnection(): void
+    {
+        $mock = new MockHttp();
+        $mock->handler->append(new ConnectException(
+            'cURL error 28: Operation too slow',
+            new Request('POST', 'https://x'),
+            null,
+            ['errno' => 28, 'connect_time' => 0.012],
+        ));
+        $mock->handler->append(MockHttp::jsonResponse(200, ['status' => 'success', 'result' => null]));
+
+        $audd = new AudD(apiToken: 'test', httpClient: $mock->buildClient(), backoffFactor: 0.001);
+        try {
+            $audd->recognize('https://x.mp3');
+            self::fail('expected error');
+        } catch (AudDConnectionException) {
+            self::assertCount(1, $mock->history);
+        }
+    }
+
+    public function testRecognitionPolicyRetriesAConnectTimeout(): void
+    {
+        $mock = new MockHttp();
+        $mock->handler->append(new ConnectException(
+            'cURL error 28: Connection timed out',
+            new Request('POST', 'https://x'),
+            null,
+            ['errno' => 28, 'connect_time' => 0.0],
+        ));
+        $mock->handler->append(MockHttp::jsonResponse(200, ['status' => 'success', 'result' => null]));
+
+        $audd = new AudD(apiToken: 'test', httpClient: $mock->buildClient(), backoffFactor: 0.001);
+        self::assertNull($audd->recognize('https://x.mp3'));
+        self::assertCount(2, $mock->history);
+    }
+
     public function testReadPolicyExhaustsRetriesAndSurfacesConnectionException(): void
     {
         $mock = new MockHttp();
@@ -89,5 +125,26 @@ final class RetryTest extends TestCase
         $audd = new AudD(apiToken: 'test', httpClient: $mock->buildClient(), backoffFactor: 0.001);
         $this->expectException(AudDConnectionException::class);
         $audd->streams()->list();
+    }
+
+    public function testZeroMaxRetriesSendsEachRequestOnce(): void
+    {
+        $mock = new MockHttp();
+        $mock->handler->append(MockHttp::jsonResponse(503, ['err' => 'boom']));
+        $mock->handler->append(MockHttp::jsonResponse(200, ['status' => 'success', 'result' => null]));
+
+        $audd = new AudD(apiToken: 'test', maxRetries: 0, backoffFactor: 0.001, httpClient: $mock->buildClient());
+        try {
+            $audd->recognize('https://x.mp3');
+            self::fail('expected AudDServerException');
+        } catch (AudDServerException) {
+            self::assertCount(1, $mock->history);
+        }
+
+        $mock2 = new MockHttp();
+        $mock2->handler->append(MockHttp::jsonResponse(200, ['status' => 'success', 'result' => null]));
+        $audd2 = new AudD(apiToken: 'test', maxRetries: 0, httpClient: $mock2->buildClient());
+        self::assertNull($audd2->recognize('https://x.mp3'));
+        self::assertCount(1, $mock2->history);
     }
 }

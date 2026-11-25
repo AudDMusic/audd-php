@@ -27,11 +27,10 @@ use Psr\Http\Client\ClientInterface;
  * $poll->run();
  * ```
  *
- * Failure handling:
- *   - HTTP non-2xx → AudDServerException via the registered onError handler.
- *   - JSON decode failure on 2xx → AudDSerializationException.
- *   - READ-class retries on 5xx + connection errors with configurable
- *     `maxRetries` / `backoffFactor`, matching the authenticated client.
+ * Responses, retries and stopping work as described on `LongpollPoll`.
+ * `maxRetries` (attempts per poll request, including the first) and
+ * `backoffFactor` (seconds; also scales the waits between polls) apply the
+ * same way as on the authenticated client.
  */
 final class LongpollConsumer
 {
@@ -59,7 +58,12 @@ final class LongpollConsumer
     /**
      * Build a longpoll handle. Register `onMatch`/`onNotification`/`onError`
      * on the returned `LongpollPoll`, then call `run()` to drive the loop
-     * until `close()` is called or a terminal error fires.
+     * until `close()` is called or an error ends the subscription.
+     *
+     * @param int|null $sinceTime Server timestamp (ms) to resume after; only
+     *                            newer events are delivered.
+     * @param int      $timeout   Seconds the server holds each poll open
+     *                            waiting for events, 1 to 120.
      */
     public function iterate(?int $sinceTime = null, int $timeout = 50): LongpollPoll
     {

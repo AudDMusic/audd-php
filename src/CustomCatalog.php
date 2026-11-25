@@ -23,8 +23,8 @@ final class CustomCatalog
     private const UPLOAD_URL = 'https://api.audd.io/upload/';
 
     /**
-     * @param Retry $retryPolicy `add()` is metered — the SDK passes a
-     *  no-retry policy here so a transport failure cannot double-charge.
+     * @param Retry $retryPolicy The SDK passes a no-retry policy: `add()` is
+     *  sent once, and the caller decides whether to send it again.
      */
     public function __construct(
         private readonly HttpClient $http,
@@ -44,10 +44,10 @@ final class CustomCatalog
      * There is no public list/delete endpoint; track audio_id ↔ song mappings
      * on your side.
      *
-     * Retry behavior: this endpoint is metered, so the SDK never auto-retries
-     * `add()` — a transport failure surfaces as an exception (rather than
-     * potentially double-charging by re-uploading). Implement any retry policy
-     * yourself, after deciding whether the previous attempt is safe to repeat.
+     * Retry behavior: `add()` is sent once and never retried automatically —
+     * any failure, including a transport error, surfaces as an exception.
+     * Check the error before sending it again (an upload to an `audio_id`
+     * that already holds a song replaces it).
      *
      * @phpstan-param string|StreamInterface|SourceBytes|resource $source
      */

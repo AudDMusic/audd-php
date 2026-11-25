@@ -125,6 +125,57 @@ final class LoggerTest extends TestCase
         }
     }
 
+    public function testTopLevelCode51WarningIsLoggedAndRaisedAsDeprecation(): void
+    {
+        $message = 'Recognition warning: you used deprecated or nonexistent parameters. '
+            . 'You can send  `musicbrainz`, `apple_music`, `spotify`, `deezer` in the `return` parameter.';
+        $mock = new MockHttp();
+        $mock->handler->append(MockHttp::jsonResponse(200, [
+            'status' => 'success',
+            'result' => ['artist' => 'A', 'title' => 'B', 'timecode' => '00:56'],
+            'warning' => ['error_code' => 51, 'error_message' => $message],
+        ]));
+        $logger = new SpyLogger();
+        $audd = new AudD(apiToken: 'test', httpClient: $mock->buildClient(), logger: $logger);
+
+        $notices = [];
+        set_error_handler(static function (int $level, string $msg) use (&$notices): bool {
+            $notices[] = [$level, $msg];
+            return true;
+        }, E_USER_DEPRECATED);
+        try {
+            $result = $audd->recognize('https://x.mp3', return_metadata: 'napster');
+        } finally {
+            restore_error_handler();
+        }
+
+        self::assertNotNull($result);
+        self::assertSame('A', $result->artist);
+        self::assertSame([[E_USER_DEPRECATED, $message]], $notices);
+        $warnings = $logger->byLevel(LogLevel::WARNING);
+        self::assertCount(1, $warnings);
+        self::assertSame('audd: deprecated parameter', $warnings[0]['message']);
+        self::assertSame($message, $warnings[0]['context']['message']);
+    }
+
+    public function testOtherTopLevelWarningIsLogged(): void
+    {
+        $mock = new MockHttp();
+        $mock->handler->append(MockHttp::jsonResponse(200, [
+            'status' => 'success',
+            'result' => [['offset' => '00:00', 'songs' => []]],
+            'warning' => ['error_code' => 77, 'error_message' => 'something to know'],
+        ]));
+        $logger = new SpyLogger();
+        $audd = new AudD(apiToken: 'test', httpClient: $mock->buildClient(), logger: $logger);
+
+        self::assertSame([], $audd->recognizeEnterprise('https://x.mp3', limit: 1));
+        $warnings = $logger->byLevel(LogLevel::WARNING);
+        self::assertCount(1, $warnings);
+        self::assertSame('something to know', $warnings[0]['context']['message']);
+        self::assertSame(77, $warnings[0]['context']['error_code']);
+    }
+
     /**
      * The `exception` context entry holds a Throwable whose message we don't
      * control (callers can put anything in it). Strip those before scanning

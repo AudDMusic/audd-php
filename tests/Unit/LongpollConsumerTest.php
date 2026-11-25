@@ -41,7 +41,7 @@ final class LongpollConsumerTest extends TestCase
         $poll->run();
         self::assertCount(1, $matches);
         self::assertSame('A', $matches[0]->song->artist);
-        // Sanity: the keepalive consumed one HTTP call, the match the next.
+        // Sanity: the timeout response consumed one HTTP call, the match the next.
         self::assertCount(2, $mock->history);
     }
 
@@ -66,10 +66,12 @@ final class LongpollConsumerTest extends TestCase
         self::assertInstanceOf(AudDServerException::class, $captured);
     }
 
-    public function test2xxBadJsonRaisesSerializationException(): void
+    public function test2xxBadJsonRaisesSerializationExceptionWhenItPersists(): void
     {
         $mock = new MockHttp();
-        $mock->handler->append(MockHttp::rawResponse(200, '<not-json>'));
+        for ($i = 0; $i < 8; $i++) {
+            $mock->handler->append(MockHttp::rawResponse(200, '<not-json>'));
+        }
 
         $consumer = new LongpollConsumer(
             category: 'abc',
@@ -83,6 +85,7 @@ final class LongpollConsumerTest extends TestCase
         });
         $poll->run();
         self::assertInstanceOf(AudDSerializationException::class, $captured);
+        self::assertCount(8, $mock->history);
     }
 
     public function testNoTokenAddedToQuery(): void
@@ -130,7 +133,7 @@ final class LongpollConsumerTest extends TestCase
         $poll = $consumer->iterate();
         $poll->onMatch(fn () => $poll->close());
         $poll->run();
-        // 503 → retry; keepalive (consumed silently); match.
+        // 503 → retry; timeout response (consumed silently); match.
         self::assertCount(3, $mock->history);
     }
 

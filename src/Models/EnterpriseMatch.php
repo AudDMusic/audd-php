@@ -11,8 +11,9 @@ use AudD\StreamingProvider;
  * Public-DB matches expose artist/title/etc.; custom-DB matches (your own
  * fingerprint catalog) expose audio_id instead.
  *
- * Streaming URLs are lis.tn-only: enterprise responses don't carry per-provider
- * metadata blocks, so there's no direct-URL fallback.
+ * Streaming URLs come from the lis.tn redirect only. Enterprise responses
+ * carry per-provider metadata blocks only when requested with `return`; they
+ * aren't typed here and land in `extras`.
  */
 final class EnterpriseMatch extends ForwardCompatModel
 {
@@ -97,19 +98,20 @@ final class EnterpriseMatch extends ForwardCompatModel
     }
 
     /**
-     * Lis.tn redirect URL for a streaming provider. Returns null when
-     * `song_link` is not on `lis.tn` — enterprise responses don't carry the
-     * per-provider metadata blocks that recognize() responses do, so the
-     * direct-URL fallback used by RecognitionResult does not apply here.
+     * Lis.tn redirect URL for a streaming provider (`?spotify`, `?apple`,
+     * `?deezer`, `?youtube`). Returns null when `song_link` is not on
+     * `lis.tn`, and always for Napster. Unlike RecognitionResult there is no
+     * direct-URL fallback from metadata blocks.
      */
     public function streamingUrl(StreamingProvider $provider): ?string
     {
-        return self::lisTnRedirect($this->song_link, $provider->value);
+        $key = $provider->lisTnKey();
+        return $key === null ? null : self::lisTnRedirect($this->song_link, $key);
     }
 
     /**
-     * All five providers' lis.tn redirect URLs. Empty array when `song_link`
-     * is not on `lis.tn`.
+     * Every provider's lis.tn redirect URL, keyed by provider value. Empty
+     * array when `song_link` is not on `lis.tn`.
      *
      * @return array<string, string>
      */
